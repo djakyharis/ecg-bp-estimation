@@ -1,13 +1,12 @@
 # ecg-bp-estimation
 
-[![CI](https://github.com/YOUR_USERNAME/ecg-bp-estimation/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/ecg-bp-estimation/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Framework](https://img.shields.io/badge/framework-PyTorch-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 > Continuous blood pressure estimation from ECG using **Adaptive Weight Learning-Based Multitask BiLSTM**.
 >
-> Undergraduate Thesis — Computer Engineering, Universitas Brawijaya  
+> Undergraduate Thesis — Computer Engineering, Universitas Brawijaya
 > Supervisor: Edita Rosana Widasari, S.T., M.T., M.Eng., Ph.D.
 
 ---
@@ -96,14 +95,14 @@ ecg-bp-estimation/
 
 All parameters are centralized in [`src/config.py`](src/config.py):
 
-| Parameter | Value | Description |
-|---|---|---|
-| `shimmer_fs` | 256 Hz | Shimmer3 ECG sensor sampling rate |
-| `target_fs` | 125 Hz | Resampling target (Kachuee dataset aligned) |
-| `notch_freq` | 50 Hz | PLN interference frequency |
-| `lowcut / highcut` | 0.5 / 40 Hz | Bandpass filter range |
-| `seq_length` | 1250 samples | Input window (10 s @ 125 Hz) |
-| `bilstm_hidden_units` | 256 | BiLSTM hidden units per direction |
+| Parameter               | Value        | Description                                 |
+| ----------------------- | ------------ | ------------------------------------------- |
+| `shimmer_fs`          | 256 Hz       | Shimmer3 ECG sensor sampling rate           |
+| `target_fs`           | 125 Hz       | Resampling target (Kachuee dataset aligned) |
+| `notch_freq`          | 50 Hz        | PLN interference frequency                  |
+| `lowcut / highcut`    | 0.5 / 40 Hz  | Bandpass filter range                       |
+| `seq_length`          | 1250 samples | Input window (10 s @ 125 Hz)                |
+| `bilstm_hidden_units` | 256          | BiLSTM hidden units per direction           |
 
 ---
 
@@ -138,5 +137,5 @@ Lihat [`data/README.md`](data/README.md) untuk detail instruksi download.
 
 ## License
 
-Code — [MIT License](LICENSE).  
+Code — [MIT License](LICENSE).
 Dataset Kachuee (Kaggle) — [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
