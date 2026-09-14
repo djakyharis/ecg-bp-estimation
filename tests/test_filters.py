@@ -1,13 +1,20 @@
 """
 Unit tests untuk modul pra-pemrosesan sinyal ECG.
-Verifikasi Notch filter 50 Hz, Butterworth Bandpass filter, Robust Scaling, dan Pipeline.
+Verifikasi Notch filter 50 Hz, Butterworth Bandpass filter,
+Percentile Clip & Scale [0,1] (normalisasi kanonik pipeline), dan Pipeline end-to-end.
+
+Catatan normalisasi:
+  - percentile_clip_scale : normalisasi KANONIK yang digunakan di ECGPreprocessingPipeline.
+                            Output bounded [0, 1], robust terhadap outlier via Q1-Q99 clipping.
+  - robust_scale          : utilitas alternatif (Z-score berbasis IQR), output unbounded.
+                            Tidak digunakan di pipeline produksi.
 """
 
 import pytest
 import numpy as np
 
 from src.preprocessing.filters import iir_notch_filter, butterworth_bandpass_filter
-from src.preprocessing.normalization import robust_scale
+from src.preprocessing.normalization import percentile_clip_scale
 from src.preprocessing.pipeline import ECGPreprocessingPipeline
 
 
@@ -44,14 +51,19 @@ def test_butterworth_bandpass_filter(synthetic_ecg_signal):
     assert np.std(filtered) < np.std(raw_signal)
 
 
-def test_robust_scale(synthetic_ecg_signal):
+def test_percentile_clip_scale(synthetic_ecg_signal):
+    """Verifikasi fungsi normalisasi kanonik yang digunakan di ECGPreprocessingPipeline."""
     raw_signal, _ = synthetic_ecg_signal
-    scaled = robust_scale(raw_signal)
-    
+    scaled = percentile_clip_scale(raw_signal, q_low_percentile=1.0, q_high_percentile=99.0)
+
     assert scaled.shape == raw_signal.shape
     assert not np.isnan(scaled).any()
-    # Median sinyal hasil scaling harus mendekati 0
-    assert np.isclose(np.median(scaled), 0.0, atol=1e-2)
+    # Output harus bounded dalam [0, 1]
+    assert scaled.min() >= 0.0, f"Nilai minimum {scaled.min():.4f} di bawah 0"
+    assert scaled.max() <= 1.0, f"Nilai maksimum {scaled.max():.4f} di atas 1"
+    # Outlier (di luar Q1-Q99) harus terpotong — tidak ada nilai di atas 1 atau di bawah 0
+    # Verifikasi: nilai persentil ke-99 dari sinyal asli harus berkorespondensi dengan nilai 1.0
+    assert np.isclose(scaled.max(), 1.0, atol=1e-6)
 
 
 def test_ecg_preprocessing_pipeline(synthetic_ecg_signal):

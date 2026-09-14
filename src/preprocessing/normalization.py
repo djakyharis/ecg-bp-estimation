@@ -1,7 +1,14 @@
 """
 Modul Normalisasi Amplitudo Sinyal ECG.
-Mengimplementasikan Robust Scaling berbasis Median & Interquartile Range (IQR)
-serta Persentil Clipping & Normalisasi [0, 1] (Proposal Subbab 2.2.4 & Butarbutar & Widasari, 2026).
+
+Fungsi yang tersedia:
+  - percentile_clip_scale : normalisasi KANONIK untuk ECGPreprocessingPipeline.
+                            Output bounded [0, 1] via clipping persentil Q1–Q99.
+                            Digunakan di pipeline.py dan notebook visualisasi.
+  - robust_scale          : utilitas alternatif berbasis Median & IQR (output unbounded).
+                            Tidak digunakan di pipeline produksi.
+
+Referensi: Proposal Subbab 2.2.4 & Butarbutar & Widasari (2026).
 """
 
 import numpy as np
