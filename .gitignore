@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data — hanya placeholder yang di-track, bukan isinya
+data/raw/
+data/processed/
+data/interim/
+data/*.csv
+data/*.dat
+data/*.hea
+data/*.mat
+data/*.h5
+data/*.hdf5
+
+# Model checkpoints & output training
+checkpoints/
+logs/
+runs/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
