@@ -158,6 +158,8 @@ class KachueeDatasetInspector:
 
         map_val = float(np.mean(abp_signal))
 
+        is_valid = bool(len(systolic_peaks_idx) > 0 and 50.0 <= sbp <= 220.0 and 30.0 <= dbp <= 140.0)
+
         return {
             "sbp": sbp,
             "dbp": dbp,
@@ -165,6 +167,7 @@ class KachueeDatasetInspector:
             "systolic_peaks_idx": systolic_peaks_idx,
             "diastolic_troughs_idx": diastolic_troughs_idx,
             "n_beats": len(systolic_peaks_idx),
+            "valid": is_valid,
         }
 
     def inspect_and_plot(

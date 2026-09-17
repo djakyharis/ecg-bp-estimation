@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECG to BP Estimation — Deep Learning Multi-Task BiLSTM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-base: #0a0f1d;
+            --bg-surface: #111827;
+            --bg-card: rgba(17, 24, 39, 0.85);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(59, 130, 246, 0.4);
+            
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.25);
+            --accent-cyan: #06b6d4;
+            --accent-purple: #8b5cf6;
+            --accent-rose: #f43f5e;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.08) 0%, transparent 40%);
+            overflow-x: hidden;
+        }
+
+        /* HEADER */
+        header {
+            padding: 18px 32px;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            background: rgba(10, 15, 29, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .pulse-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .brand-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-subtitle {
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            font-weight: 500;
+        }
+
+        .sys-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            color: var(--accent-emerald);
+            font-weight: 600;
+        }
+
+        .sys-badge .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-emerald);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-emerald);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        /* MAIN CONTAINER */
+        main {
+            flex: 1;
+            padding: 24px 32px;
+            max-width: 1560px;
+            margin: 0 auto;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 24px;
+        }
+
+        /* CARD STYLES */
+        .glass-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 22px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .glass-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* CONTROLS SIDEBAR */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px 14px;
+            border-radius: 10px;
+            outline: none;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary-glow);
+        }
+
+        .range-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .range-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            font-size: 0.95rem;
+            min-width: 55px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 13px 20px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border: none;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(37, 99, 235, 0.35);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(37, 99, 235, 0.5);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            margin-top: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* STAGE TABS */
+        .stage-tabs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 4px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .tab-btn {
+            padding: 8px 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            font-size: 0.76rem;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 2px 10px var(--primary-glow);
+        }
+
+        /* MAIN CONTENT AREA */
+        .content-area {
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        /* RESULTS CARDS */
+        .bp-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+        }
+
+        .bp-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bp-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--card-color, var(--primary));
+        }
+
+        .bp-card-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .bp-card-val {
+            font-size: 2.3rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            margin: 8px 0 4px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .bp-card-val .unit {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-dim);
+        }
+
+        .bp-card-sub {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* CLINICAL BADGE */
+        .clinical-banner {
+            padding: 18px 24px;
+            border-radius: 16px;
+            background: rgba(42, 157, 143, 0.12);
+            border: 1px solid rgba(42, 157, 143, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .clinical-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .clinical-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .clinical-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .clinical-desc {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* CHART CONTAINER */
+        .chart-box {
+            position: relative;
+            height: 320px;
+            width: 100%;
+        }
+
+        /* ARCHITECTURE MINI SUMMARY */
+        .arch-summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .arch-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 10px;
+        }
+
+        .arch-item-lbl {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            font-weight: 600;
+        }
+
+        .arch-item-val {
+            font-size: 0.85rem;
+            color: var(--text-main);
+            font-weight: 700;
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="pulse-logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+            </div>
+            <div>
+                <div class="brand-title">Estimasi Tekanan Darah Non-Invasif (ECG-to-BP)</div>
+                <div class="brand-subtitle">Deep Learning Multi-Task BiLSTM & Preprocessing Pipeline</div>
+            </div>
+        </div>
+        <div class="sys-badge">
+            <div class="dot"></div>
+            Model Ready (PyTorch 125 Hz)
+        </div>
+    </header>
+
+    <main>
+        <!-- SIDEBAR CONTROLS -->
+        <div class="sidebar">
+            <div class="glass-card">
+                <div class="card-header">
+                    <span class="card-title">⚙️ Konfigurasi Sinyal</span>
+                </div>
+
+                <div class="form-group">
+                    <label>Sumber Sinyal ECG</label>
+                    <select id="sourceSelect">
+                        <option value="synthetic">Sintetis (Fisiologis + Kontaminasi Noise)</option>
+                        <option value="kachuee">Kachuee et al. Dataset Sample</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="hrGroup">
+                    <label>Denyut Jantung (Heart Rate)</label>
+                    <div class="range-wrap">
+                        <input type="range" id="hrRange" min="50" max="140" value="75" step="1">
+                        <span class="range-value" id="hrValue">75 BPM</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="btnPredict" onclick="runInference()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Jalankan Estimasi Model
+                </button>
+
+                <button class="btn btn-secondary" onclick="loadSampleSignal()">
+                    🔄 Refresh / Muat Sinyal Baru
+                </button>
+            </div>
+
+            <div class="glass-card">
+                <div class="card-header">
+                    <span class="card-title">🧠 Arsitektur Jaringan</span>
+                </div>
+                <div class="arch-summary">
+                    <div class="arch-item">
+                        <div class="arch-item-lbl">ENCODER</div>
+                        <div class="arch-item-val">BiLSTM (2x256)</div>
+                    </div>
+                    <div class="arch-item">
+                        <div class="arch-item-lbl">INPUT</div>
+                        <div class="arch-item-val">1250 x 1</div>
+                    </div>
+                    <div class="arch-item">
+                        <div class="arch-item-lbl">HEADS</div>
+                        <div class="arch-item-val">3 (SBP, DBP, MAP)</div>
+                    </div>
+                    <div class="arch-item">
+                        <div class="arch-item-lbl">LOSS</div>
+                        <div class="arch-item-val">Adaptive Unc.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN DISPLAY -->
+        <div class="content-area">
+            <!-- BLOOD PRESSURE ESTIMATION RESULTS -->
+            <div class="bp-grid">
+                <div class="bp-card" style="--card-color: var(--primary);">
+                    <div class="bp-card-label">Systolic BP (SBP)</div>
+                    <div class="bp-card-val" id="sbpVal">-- <span class="unit">mmHg</span></div>
+                    <div class="bp-card-sub">Target Normal: &lt; 120 mmHg</div>
+                </div>
+
+                <div class="bp-card" style="--card-color: var(--accent-emerald);">
+                    <div class="bp-card-label">Diastolic BP (DBP)</div>
+                    <div class="bp-card-val" id="dbpVal">-- <span class="unit">mmHg</span></div>
+                    <div class="bp-card-sub">Target Normal: &lt; 80 mmHg</div>
+                </div>
+
+                <div class="bp-card" style="--card-color: var(--accent-amber);">
+                    <div class="bp-card-label">Mean Arterial (MAP)</div>
+                    <div class="bp-card-val" id="mapVal">-- <span class="unit">mmHg</span></div>
+                    <div class="bp-card-sub">Perfusi Normal: 70 - 100 mmHg</div>
+                </div>
+            </div>
+
+            <!-- CLINICAL CLASSIFICATION STATUS -->
+            <div class="clinical-banner" id="clinicalBanner">
+                <div class="clinical-left">
+                    <div class="clinical-icon" id="clinicalIcon">❤️</div>
+                    <div>
+                        <div class="clinical-title" id="clinicalCategory">Kategori: Menunggu Inferensi...</div>
+                        <div class="clinical-desc" id="clinicalDesc">Klik tombol 'Jalankan Estimasi Model' untuk memprediksi tekanan darah.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WAVEFORM VISUALIZER -->
+            <div class="glass-card">
+                <div class="card-header">
+                    <span class="card-title">📈 Inspeksi Gelombang Sinyal ECG (10 Detik @ 125 Hz)</span>
+                </div>
+
+                <!-- STAGE TABS -->
+                <div class="stage-tabs">
+                    <button class="tab-btn active" onclick="switchStage('raw')">1. Sinyal Mentah</button>
+                    <button class="tab-btn" onclick="switchStage('notch')">2. Notch 50 Hz</button>
+                    <button class="tab-btn" onclick="switchStage('bandpass')">3. Bandpass 0.5-40Hz</button>
+                    <button class="tab-btn" onclick="switchStage('normalized')">4. Normalisasi [0,1]</button>
+                </div>
+
+                <div class="chart-box">
+                    <canvas id="ecgChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentSignalData = null;
+        let activeStage = 'raw';
+        let chartInstance = null;
+
+        // Init Chart.js
+        const ctx = document.getElementById('ecgChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 1250}, (_, i) => (i / 125.0).toFixed(2)),
+                datasets: [{
+                    label: 'Amplitudo ECG',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    borderWidth: 1.6,
+                    pointRadius: 0,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 300 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: (items) => `Waktu: ${items[0].label} detik`,
+                            label: (item) => `Amplitudo: ${item.formattedValue}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#64748b', maxTicksLimit: 11 },
+                        title: { display: true, text: 'Waktu (Detik)', color: '#94a3b8' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#64748b' },
+                        title: { display: true, text: 'Amplitudo (a.u.)', color: '#94a3b8' }
+                    }
+                }
+            }
+        });
+
+        // Event listener HR range
+        const hrRange = document.getElementById('hrRange');
+        const hrValue = document.getElementById('hrValue');
+        hrRange.addEventListener('input', (e) => {
+            hrValue.textContent = `${e.target.value} BPM`;
+            loadSampleSignal();
+        });
+
+        document.getElementById('sourceSelect').addEventListener('change', () => {
+            loadSampleSignal();
+        });
+
+        async function loadSampleSignal() {
+            const src = document.getElementById('sourceSelect').value;
+            const hr = document.getElementById('hrRange').value;
+            try {
+                const res = await fetch(`/api/sample?type=${src}&hr=${hr}`);
+                currentSignalData = await res.json();
+                updateChart();
+            } catch (err) {
+                console.error("Gagal memuat sinyal:", err);
+            }
+        }
+
+        function switchStage(stage) {
+            activeStage = stage;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            updateChart();
+        }
+
+        function updateChart() {
+            if (!currentSignalData) return;
+            const sig = currentSignalData[activeStage] || currentSignalData.raw;
+            chartInstance.data.datasets[0].data = sig;
+            
+            // Color coding per stage
+            const colors = {
+                raw: '#94a3b8',
+                notch: '#10b981',
+                bandpass: '#06b6d4',
+                normalized: '#a855f7'
+            };
+            chartInstance.data.datasets[0].borderColor = colors[activeStage] || '#3b82f6';
+            chartInstance.update();
+        }
+
+        async function runInference() {
+            if (!currentSignalData) {
+                await loadSampleSignal();
+            }
+
+            const btn = document.getElementById('btnPredict');
+            btn.innerHTML = '⏳ Menjalankan Model BiLSTM...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ signal: currentSignalData.raw })
+                });
+                const data = await res.json();
+
+                // Update UI BP Cards
+                document.getElementById('sbpVal').innerHTML = `${data.sbp} <span class="unit">mmHg</span>`;
+                document.getElementById('dbpVal').innerHTML = `${data.dbp} <span class="unit">mmHg</span>`;
+                document.getElementById('mapVal').innerHTML = `${data.map} <span class="unit">mmHg</span>`;
+
+                // Update Clinical Banner
+                const clinical = data.clinical;
+                const banner = document.getElementById('clinicalBanner');
+                banner.style.backgroundColor = `${clinical.color}22`;
+                banner.style.borderColor = clinical.color;
+                
+                document.getElementById('clinicalCategory').textContent = `Kategori: ${clinical.category}`;
+                document.getElementById('clinicalDesc').textContent = clinical.description;
+
+                const icons = {
+                    normal: '💚',
+                    mild: '💛',
+                    moderate: '🧡',
+                    high: '❤️',
+                    critical: '🚨'
+                };
+                document.getElementById('clinicalIcon').textContent = icons[clinical.severity] || '🩺';
+
+            } catch (err) {
+                console.error("Gagal inferensi:", err);
+                alert("Terjadi kesalahan saat memproses inferensi model.");
+            } finally {
+                btn.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Jalankan Estimasi Model
+                `;
+                btn.disabled = false;
+            }
+        }
+
+        // Initial Load
+        loadSampleSignal();
+    </script>
+</body>
+</html>

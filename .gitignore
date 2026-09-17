@@ -1,4 +1,6 @@
-# Python
+# ==============================================================================
+# Python & Bytecode
+# ==============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -9,53 +11,128 @@ dist/
 build/
 .eggs/
 
-# Virtual environments
+# ==============================================================================
+# Virtual Environments & Packages
+# ==============================================================================
 venv/
 .venv/
 env/
 .env/
 ENV/
+env.bak/
+venv.bak/
 
+# ==============================================================================
+# Credentials & Secrets (SANGAT PENTING: Mencegah Leak)
+# ==============================================================================
+.env
+.env.*
+*.env
+kaggle.json
+*/kaggle.json
+.kaggle/
+*.pem
+*.key
+*.token
+credentials.json
+
+# ==============================================================================
 # Jupyter Notebook
+# ==============================================================================
 .ipynb_checkpoints/
+*/.ipynb_checkpoints/*
 *.ipynb_checkpoints
 
-# Data — hanya placeholder yang di-track, bukan isinya
+# ==============================================================================
+# Dataset & Data Files (Besar / Sensitif)
+# ==============================================================================
 data/raw/
 data/processed/
 data/interim/
+
+# Ekstensi file dataset biner & kompresi di seluruh direktori
+*.mat
+*.npz
+*.npy
+*.h5
+*.hdf5
+*.dat
+*.hea
+*.tar
+*.tar.gz
+*.zip
+*.7z
+*.rar
+*.parquet
+
+# Data file di folder data/
 data/*.csv
 data/*.dat
 data/*.hea
 data/*.mat
 data/*.h5
 data/*.hdf5
+data/*.npz
 
-# Model checkpoints & output training
+# Pengecualian: Tetap lacak file .gitkeep dan README di dalam data
+!data/.gitkeep
+!data/README.md
+!data/**/.gitkeep
+
+# ==============================================================================
+# Model Weights, Checkpoints, & Training Artifacts
+# ==============================================================================
 checkpoints/
+*/checkpoints/
 logs/
 runs/
+wandb/
+mlruns/
 *.pt
 *.pth
 *.ckpt
 *.onnx
+*.bin
+*.weights
+*.safetensors
 
-# pytest
+# ==============================================================================
+# Testing & Code Coverage
+# ==============================================================================
 .pytest_cache/
 htmlcov/
 .coverage
+.coverage.*
 coverage.xml
 
-# macOS
+# ==============================================================================
+# OS & System Artifacts (macOS / Windows / Linux)
+# ==============================================================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 .AppleDouble
 .LSOverride
 
-# IDE
+# ==============================================================================
+# IDE & Editors
+# ==============================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.pydevproject
+.settings/
 
-# Logs
+# ==============================================================================
+# Logs & Temporary Files
+# ==============================================================================
 *.log
+*.tmp
+*.temp
