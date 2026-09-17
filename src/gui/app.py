@@ -17,7 +17,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from src.preprocessing.filters import iir_notch_filter, butterworth_bandpass_filter
-from src.preprocessing.normalization import percentile_clip_scale
+from src.preprocessing.normalization import minmax_scale
 from src.models.inference import ECGBPPredictor, classify_blood_pressure_aha
 from src.inspect_dataset import KachueeDatasetInspector
 
@@ -82,7 +82,7 @@ class ECGGUIRequestHandler(SimpleHTTPRequestHandler):
             # Hitung tahapan pra-pemrosesan
             notch_sig = iir_notch_filter(raw_sig, fs=125.0, f0=50.0, q=30.0)
             bandpass_sig = butterworth_bandpass_filter(notch_sig, fs=125.0, lowcut=0.5, highcut=40.0, order=2)
-            normalized_sig = percentile_clip_scale(bandpass_sig, q_low_percentile=1.0, q_high_percentile=99.0)
+            normalized_sig = minmax_scale(bandpass_sig)
 
             payload = {
                 "fs": 125.0,

@@ -14,7 +14,7 @@ import pytest
 import numpy as np
 
 from src.preprocessing.filters import iir_notch_filter, butterworth_bandpass_filter
-from src.preprocessing.normalization import percentile_clip_scale
+from src.preprocessing.normalization import minmax_scale, percentile_clip_scale
 from src.preprocessing.pipeline import ECGPreprocessingPipeline
 
 
@@ -51,19 +51,27 @@ def test_butterworth_bandpass_filter(synthetic_ecg_signal):
     assert np.std(filtered) < np.std(raw_signal)
 
 
+def test_minmax_scale(synthetic_ecg_signal):
+    """Verifikasi fungsi normalisasi Min-Max kanonik (Fan et al., 2021 & Li et al., 2020)."""
+    raw_signal, _ = synthetic_ecg_signal
+    scaled = minmax_scale(raw_signal)
+
+    assert scaled.shape == raw_signal.shape
+    assert not np.isnan(scaled).any()
+    # Output harus bounded tepat dalam [0, 1]
+    assert np.isclose(scaled.min(), 0.0, atol=1e-6), f"Nilai min: {scaled.min()}"
+    assert np.isclose(scaled.max(), 1.0, atol=1e-6), f"Nilai max: {scaled.max()}"
+
+
 def test_percentile_clip_scale(synthetic_ecg_signal):
-    """Verifikasi fungsi normalisasi kanonik yang digunakan di ECGPreprocessingPipeline."""
+    """Verifikasi utilitas normalisasi persentil clipping [Q1, Q99]."""
     raw_signal, _ = synthetic_ecg_signal
     scaled = percentile_clip_scale(raw_signal, q_low_percentile=1.0, q_high_percentile=99.0)
 
     assert scaled.shape == raw_signal.shape
     assert not np.isnan(scaled).any()
-    # Output harus bounded dalam [0, 1]
-    assert scaled.min() >= 0.0, f"Nilai minimum {scaled.min():.4f} di bawah 0"
-    assert scaled.max() <= 1.0, f"Nilai maksimum {scaled.max():.4f} di atas 1"
-    # Outlier (di luar Q1-Q99) harus terpotong — tidak ada nilai di atas 1 atau di bawah 0
-    # Verifikasi: nilai persentil ke-99 dari sinyal asli harus berkorespondensi dengan nilai 1.0
-    assert np.isclose(scaled.max(), 1.0, atol=1e-6)
+    assert scaled.min() >= 0.0
+    assert scaled.max() <= 1.0
 
 
 def test_ecg_preprocessing_pipeline(synthetic_ecg_signal):

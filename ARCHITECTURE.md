@@ -23,7 +23,7 @@
 │  1a. Resampling          256 Hz → 125 Hz  (resample_poly, GCD-reduced)  │
 │  1b. IIR Notch Filter    eliminasi noise PLN 50 Hz  (Q = 30, filtfilt)  │
 │  1c. Butterworth BPF     0.5 – 40 Hz, Orde 4 efektif (filtfilt)         │
-│  1d. Normalisasi         Percentile Clip [Q1, Q99] → scale [0, 1]       │
+│  1d. Normalisasi         Min-Max Normalization [0, 1] (Fan et al., 2021)│
 │                                                                          │
 │  Output: np.ndarray shape: (1250,) atau (1250, 1)                       │
 │          = 10 detik sinyal bersih @ 125 Hz                               │
@@ -126,18 +126,19 @@ Membatasi bandwidth sinyal ECG pada rentang fisiologis.
 | Orde efektif     | 4 (karena`filtfilt` forward-backward) |
 | Filtering method | Zero-phase (`filtfilt`)               |
 
-### 1d. Normalisasi Persentil Clipping & Scaling
+### 1d. Normalisasi Min-Max [0, 1]
 
-| Parameter    | Nilai           |
-| ------------ | --------------- |
-| Q_low        | persentil ke-1  |
-| Q_high       | persentil ke-99 |
-| Output range | [0, 1]          |
-| ε           | 1 × 10⁻⁸     |
+Sesuai metode yang digunakan pada paper acuan utama Fan et al. (2021) & Li et al. (2020).
+
+| Parameter    | Nilai                                |
+| ------------ | ------------------------------------ |
+| x_min        | Nilai minimum pada segmen sinyal     |
+| x_max        | Nilai maksimum pada segmen sinyal    |
+| Output range | [0, 1]                               |
+| ε            | 1 × 10⁻⁸                             |
 
 ```
-x_clipped = clip(signal, Q_low, Q_high)
-x_norm    = (x_clipped - Q_low) / (Q_high - Q_low + ε)
+x_norm = (signal - x_min) / (x_max - x_min + ε)
 ```
 
 ---

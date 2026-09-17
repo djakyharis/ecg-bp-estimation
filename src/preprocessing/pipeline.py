@@ -10,7 +10,7 @@ from scipy.signal import resample_poly
 
 from ..config import PreprocessingConfig, config
 from .filters import iir_notch_filter, butterworth_bandpass_filter
-from .normalization import percentile_clip_scale
+from .normalization import minmax_scale, percentile_clip_scale, robust_scale
 
 
 class ECGPreprocessingPipeline:
@@ -100,12 +100,10 @@ class ECGPreprocessingPipeline:
             order=self.cfg.filter_order
         )
 
-        # 4. Normalisasi Persentil Clipping & Scaling [0, 1] (Proposal Subbab 2.2.4)
-        # Formula: x_norm = (clip(signal, Q_low, Q_high) - Q_low) / (Q_high - Q_low)
-        signal = percentile_clip_scale(
+        # 4. Normalisasi Min-Max [0, 1] sesuai Fan et al. (2021) & Li et al. (2020)
+        # Formula: x_norm = (signal - x_min) / (x_max - x_min + eps)
+        signal = minmax_scale(
             signal,
-            q_low_percentile=self.cfg.clip_q_low,
-            q_high_percentile=self.cfg.clip_q_high,
             eps=self.cfg.epsilon
         )
 
