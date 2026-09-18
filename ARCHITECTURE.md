@@ -52,7 +52,8 @@
 │                                                                          │
 │  Shared input: (batch, 512)                                              │
 │                                                                          │
-│  FC Head (tiap task):                                                   │
+│  FC Head (tiap task, 2 hidden layers sesuai Fan et al. 2021):             │
+│    Linear(512 → 512) → ReLU → Dropout(0.2)                             │
 │    Linear(512 → 256) → ReLU → Dropout(0.2)                             │
 │    Linear(256 → 1)                                                      │
 │                                                                          │
@@ -171,16 +172,20 @@ Input: (batch, 1250, 1)
 
 ## Stage 3 — Task-Specific FC Heads
 
-Arsitektur **identik** untuk ketiga head (SBP, DBP, MAP):
+Arsitektur **identik** untuk ketiga head (SBP, DBP, MAP) dengan 2 hidden layers sesuai Fan et al. (2021):
 
 ```
 Input: (batch, 512)
   │
-  Linear(512 → 256)
+  Linear(512 → 512)   ← Hidden Layer 1 (512 unit)
   ReLU
   Dropout(0.2)
   │
-  Linear(256 → 1)
+  Linear(512 → 256)   ← Hidden Layer 2 (256 unit)
+  ReLU
+  Dropout(0.2)
+  │
+  Linear(256 → 1)     ← Output Layer (1 unit)
   │
 Output: (batch, 1)  ← estimasi tekanan darah dalam mmHg
 ```

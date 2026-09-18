@@ -149,9 +149,10 @@ def main():
     parser.add_argument("--data-dir", type=str, default=os.path.join(PROJECT_ROOT, "data", "processed"), help="Direktori berkas .npz")
     parser.add_argument("--parts", type=str, default="1", help="Pilihan part: '1', '1,2', atau 'all'")
     parser.add_argument("--max-samples", type=int, default=None, help="Batas maksimal sampel (opsional, untuk smoke-test)")
-    parser.add_argument("--batch-size", type=int, default=64, help="Ukuran batch")
+    parser.add_argument("--batch-size", type=int, default=128, help="Ukuran batch (Fan et al. 2021: 128)")
     parser.add_argument("--epochs", type=int, default=15, help="Jumlah epoch")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate Adam")
+    parser.add_argument("--lr", type=float, default=8e-4, help="Learning rate (Fan et al. 2021: 0.0008)")
+    parser.add_argument("--optimizer", type=str, default="adamw", choices=["adamw", "sgd"], help="Pilihan optimizer: 'adamw' atau 'sgd' (Fan et al. 2021)")
     parser.add_argument("--weight-decay", type=float, default=1e-5, help="L2 regularization")
     parser.add_argument("--device", type=str, default="auto", help="'auto', 'mps', 'cuda', atau 'cpu'")
     parser.add_argument("--checkpoint-dir", type=str, default=os.path.join(PROJECT_ROOT, "checkpoints"), help="Folder checkpoint")
@@ -162,10 +163,12 @@ def main():
 
     print("=" * 70)
     print("  PELATIHAN DEEP LEARNING: MULTI-TASK BiLSTM (ECG -> SBP/DBP/MAP)")
+    print("  Parameter Sesuai Paper Acuan: Fan et al. (2021, Sensors)")
     print("=" * 70)
     print(f"  Device Akselerator : {device}")
-    print(f"  Batch Size         : {args.batch_size}")
-    print(f"  Learning Rate      : {args.lr}")
+    print(f"  Batch Size         : {args.batch_size} (Fan et al., 2021)")
+    print(f"  Learning Rate      : {args.lr} (Fan et al., 2021)")
+    print(f"  Optimizer          : {args.optimizer.upper()}")
     print(f"  Jumlah Epoch       : {args.epochs}")
     print(f"  Folder Checkpoint  : {args.checkpoint_dir}")
     print("=" * 70)
@@ -198,12 +201,23 @@ def main():
     criterion.to(device)
 
     # Parameter yang dioptimasi mencakup bobot model + learnable log variance pada adaptive loss
-    optimizer = torch.optim.AdamW(
-        list(model.parameters()) + list(criterion.parameters()),
-        lr=args.lr,
-        weight_decay=args.weight_decay
-    )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
+    params_to_optimize = list(model.parameters()) + list(criterion.parameters())
+    if args.optimizer == "sgd":
+        # Sesuai Fan et al. (2021): Momentum-SGD dengan momentum=0.9
+        optimizer = torch.optim.SGD(
+            params_to_optimize,
+            lr=args.lr,
+            momentum=0.9,
+            weight_decay=args.weight_decay
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            params_to_optimize,
+            lr=args.lr,
+            weight_decay=args.weight_decay
+        )
+    # LR Scheduler sesuai Fan et al. (2021): factor=0.9, patience=4
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, patience=4)
 
     best_val_mae = float("inf")
     best_model_path = os.path.join(args.checkpoint_dir, "best_model.pt")

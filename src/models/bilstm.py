@@ -4,9 +4,9 @@ Sesuai rancangan skripsi dan ARCHITECTURE.md:
   - Input: Sinyal ECG ternormalisasi shape [batch, 1250, 1] atau [batch, 1250] @ 125 Hz (10 detik)
   - Shared Encoder: 2-Layer Bidirectional LSTM (hidden=256, output concat=512)
   - 3 Dedicated Heads:
-      * SBP Head: Linear(512 -> 256) -> ReLU -> Dropout(0.2) -> Linear(256 -> 1)
-      * DBP Head: Linear(512 -> 256) -> ReLU -> Dropout(0.2) -> Linear(256 -> 1)
-      * MAP Head: Linear(512 -> 256) -> ReLU -> Dropout(0.2) -> Linear(256 -> 1)
+      * SBP Head: Linear(512 -> 512) -> ReLU -> Dropout(0.2) -> Linear(512 -> 256) -> ReLU -> Dropout(0.2) -> Linear(256 -> 1)
+      * DBP Head: Linear(512 -> 512) -> ReLU -> Dropout(0.2) -> Linear(512 -> 256) -> ReLU -> Dropout(0.2) -> Linear(256 -> 1)
+      * MAP Head: Linear(512 -> 512) -> ReLU -> Dropout(0.2) -> Linear(512 -> 256) -> ReLU -> Dropout(0.2) -> Linear(256 -> 1)
 """
 
 from typing import Dict, Tuple, Optional
@@ -17,15 +17,28 @@ import torch.nn as nn
 class TaskSpecificHead(nn.Module):
     """
     Fully Connected Regression Head untuk masing-masing target tekanan darah.
+    Fan et al. (2021):
+      - Hidden Layer 1: 512 units + ReLU
+      - Hidden Layer 2: 256 units + ReLU
+      - Output Layer: 1 unit
     """
 
-    def __init__(self, in_features: int = 512, hidden_dim: int = 256, dropout: float = 0.2):
+    def __init__(
+        self,
+        in_features: int = 512,
+        hidden_dim1: int = 512,
+        hidden_dim2: int = 256,
+        dropout: float = 0.2
+    ):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(in_features, hidden_dim),
+            nn.Linear(in_features, hidden_dim1),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, 1),
+            nn.Linear(hidden_dim1, hidden_dim2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim2, 1),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -76,10 +89,18 @@ class ECGMultiTaskBiLSTM(nn.Module):
         # Dimensi output BiLSTM (2 * hidden_size karena bidirectional)
         encoder_out_dim = hidden_size * 2  # 256 * 2 = 512
 
-        # 3 Dedicated Task Heads
-        self.sbp_head = TaskSpecificHead(in_features=encoder_out_dim, hidden_dim=256, dropout=head_dropout)
-        self.dbp_head = TaskSpecificHead(in_features=encoder_out_dim, hidden_dim=256, dropout=head_dropout)
-        self.map_head = TaskSpecificHead(in_features=encoder_out_dim, hidden_dim=256, dropout=head_dropout)
+        # 3 Dedicated Task Heads (2 hidden layers: 512 -> 256 -> 1 sesuai Fan et al. 2021)
+        fc1_dim = encoder_out_dim if encoder_out_dim != 512 else 512
+        fc2_dim = encoder_out_dim // 2 if encoder_out_dim != 512 else 256
+        self.sbp_head = TaskSpecificHead(
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=head_dropout
+        )
+        self.dbp_head = TaskSpecificHead(
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=head_dropout
+        )
+        self.map_head = TaskSpecificHead(
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=head_dropout
+        )
 
     def extract_features(self, x: torch.Tensor) -> torch.Tensor:
         """
