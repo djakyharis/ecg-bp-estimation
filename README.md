@@ -130,8 +130,10 @@ Lihat [`data/README.md`](data/README.md) untuk detail instruksi download.
 
 ## References
 
-- Kachuee, M., et al. (2015). Cuffless Blood Pressure Estimation Algorithms for Continuous Health-Care Monitoring. *IEEE TBME*, 64(4), 859–869. DOI: 10.1109/TBME.2015.2508812
-- Pan, J., & Tompkins, W. J. (1985). A Real-Time QRS Detection Algorithm. *IEEE TBME*, 32(3), 230–236.
+- Fan, X., Ren, M., Wang, Y., Zhang, X., & Song, Y. (2021). An Adaptive Weight Learning-Based Multitask Deep Network for Continuous Blood Pressure Estimation Using Electrocardiogram Signals. *Sensors*, 21(5), 1845. DOI: 10.3390/s21051845
+- Kachuee, M., Kiani, M. M., Mohammadzade, H., & Shabany, M. (2016). Cuffless Blood Pressure Estimation Algorithms for Continuous Health-Care Monitoring. *IEEE TBME*, 64(4), 859–869. DOI: 10.1109/TBME.2015.2508812
+- Li, Y. H., Harfianto, C. Z., Purwandari, K., & Lin, Y. D. (2020). Real-Time Cuffless Continuous Blood Pressure Estimation Using Deep Learning Model. *Sensors*, 20(19), 5606. DOI: 10.3390/s20195606
+- Pan, J., & Tompkins, W. J. (1985). A Real-Time QRS Detection Algorithm. *IEEE TBME*, 32(3), 230–236. DOI: 10.1109/TBME.1985.325532
 
 ---
 

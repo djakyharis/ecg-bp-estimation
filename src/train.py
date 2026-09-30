@@ -114,12 +114,13 @@ def evaluate(
     model: nn.Module,
     criterion: AdaptiveMultiTaskLoss,
     dataloader: DataLoader,
-    device: torch.device
+    device: torch.device,
+    update_adaptive_weights: bool = False
 ) -> Dict[str, float]:
-    """Evaluasi pada validation / test set."""
+    """Evaluasi pada validation / test set sesuai Fan et al. (2021) Algorithm 1."""
     model.eval()
     total_loss = 0.0
-    mae_sbp_sum, mae_dbp_sum, mae_map_sum = 0.0, 0.0, 0.0
+    mae_sbp_list, mae_dbp_list, mae_map_list = [], [], []
     n_batches = 0
 
     with torch.no_grad():
@@ -131,16 +132,20 @@ def evaluate(
             loss, metrics = criterion(sbp_pred, dbp_pred, map_pred, y_batch)
 
             total_loss += metrics["loss_total"]
-            mae_sbp_sum += metrics["mae_sbp"]
-            mae_dbp_sum += metrics["mae_dbp"]
-            mae_map_sum += metrics["mae_map"]
+            mae_sbp_list.append(metrics["mae_sbp"])
+            mae_dbp_list.append(metrics["mae_dbp"])
+            mae_map_list.append(metrics["mae_map"])
             n_batches += 1
+
+    # Pembaruan bobot adaptif berbasis tren validasi (Fan et al., 2021 Eq. 8-10)
+    if update_adaptive_weights and len(mae_sbp_list) > 0:
+        criterion.update_weights_from_validation(mae_sbp_list, mae_dbp_list, mae_map_list)
 
     return {
         "loss": total_loss / max(1, n_batches),
-        "mae_sbp": mae_sbp_sum / max(1, n_batches),
-        "mae_dbp": mae_dbp_sum / max(1, n_batches),
-        "mae_map": mae_map_sum / max(1, n_batches),
+        "mae_sbp": float(np.mean(mae_sbp_list)) if mae_sbp_list else 0.0,
+        "mae_dbp": float(np.mean(mae_dbp_list)) if mae_dbp_list else 0.0,
+        "mae_map": float(np.mean(mae_map_list)) if mae_map_list else 0.0,
     }
 
 
@@ -193,15 +198,16 @@ def main():
 
     print(f"[Split] Train: {len(train_set):,} | Val: {len(val_set):,} | Test: {len(test_set):,}")
 
-    # 3. Inisialisasi Model, Loss, dan Optimizer
-    model = ECGMultiTaskBiLSTM(input_size=1, hidden_size=256, num_layers=2, lstm_dropout=0.3, head_dropout=0.2)
+    # 3. Inisialisasi Model, Loss, dan Optimizer (Tabel 1 Fan et al., 2021)
+    model = ECGMultiTaskBiLSTM(input_size=1, hidden_size=256, num_layers=2, dropout=0.0)
     model.to(device)
 
-    criterion = AdaptiveMultiTaskLoss(loss_fn_type="mae", init_log_var=0.0)
+    # Adaptive Weight Learning loss (Algorithm 1, Fan et al., 2021)
+    criterion = AdaptiveMultiTaskLoss(loss_fn_type="mae")
     criterion.to(device)
 
-    # Parameter yang dioptimasi mencakup bobot model + learnable log variance pada adaptive loss
-    params_to_optimize = list(model.parameters()) + list(criterion.parameters())
+    # Bobot model yang dioptimasi (bobot loss diperbarui dinamis via tren validasi)
+    params_to_optimize = model.parameters()
     if args.optimizer == "sgd":
         # Sesuai Fan et al. (2021): Momentum-SGD dengan momentum=0.9
         optimizer = torch.optim.SGD(
@@ -229,7 +235,8 @@ def main():
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
         train_res = train_one_epoch(model, criterion, optimizer, train_loader, device)
-        val_res = evaluate(model, criterion, val_loader, device)
+        # Evaluasi validasi dengan pembaruan bobot adaptif theta (Fan et al., 2021 Eq. 8-10)
+        val_res = evaluate(model, criterion, val_loader, device, update_adaptive_weights=True)
         scheduler.step(val_res["loss"])
         elapsed = time.time() - t0
 
@@ -249,11 +256,13 @@ def main():
         else:
             mark = ""
 
+        w = criterion.weights.tolist()
         print(
             f"Epoch [{epoch:02d}/{args.epochs:02d}] ({elapsed:.1f}s) | "
             f"Train Loss: {train_res['loss']:.3f} | "
             f"Val Loss: {val_res['loss']:.3f} | "
-            f"Val MAE -> SBP: {val_res['mae_sbp']:.2f}, DBP: {val_res['mae_dbp']:.2f}, MAP: {val_res['mae_map']:.2f} mmHg {mark}"
+            f"Val MAE -> SBP: {val_res['mae_sbp']:.2f}, DBP: {val_res['mae_dbp']:.2f}, MAP: {val_res['mae_map']:.2f} mmHg {mark} | "
+            f"θ=[{w[0]:.2f}, {w[1]:.2f}, {w[2]:.2f}]"
         )
 
     total_time = time.time() - start_time

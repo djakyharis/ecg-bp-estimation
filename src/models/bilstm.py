@@ -17,10 +17,10 @@ import torch.nn as nn
 class TaskSpecificHead(nn.Module):
     """
     Fully Connected Regression Head untuk masing-masing target tekanan darah.
-    Fan et al. (2021):
+    Fan et al. (2021) Section 2.3 & Table 1:
       - Hidden Layer 1: 512 units + ReLU
       - Hidden Layer 2: 256 units + ReLU
-      - Output Layer: 1 unit
+      - Output Layer: 1 unit (Linear murni / tanpa aktivasi)
     """
 
     def __init__(
@@ -28,18 +28,24 @@ class TaskSpecificHead(nn.Module):
         in_features: int = 512,
         hidden_dim1: int = 512,
         hidden_dim2: int = 256,
-        dropout: float = 0.2
+        dropout: float = 0.0
     ):
         super().__init__()
-        self.net = nn.Sequential(
+        layers = [
             nn.Linear(in_features, hidden_dim1),
             nn.ReLU(),
-            nn.Dropout(dropout),
+        ]
+        if dropout > 0.0:
+            layers.append(nn.Dropout(dropout))
+        layers.extend([
             nn.Linear(hidden_dim1, hidden_dim2),
             nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim2, 1),
-        )
+        ])
+        if dropout > 0.0:
+            layers.append(nn.Dropout(dropout))
+        layers.append(nn.Linear(hidden_dim2, 1))
+
+        self.net = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -59,6 +65,7 @@ class TaskSpecificHead(nn.Module):
 class ECGMultiTaskBiLSTM(nn.Module):
     """
     Model Multi-Task BiLSTM untuk estimasi simultan SBP, DBP, dan MAP dari sinyal ECG 10 detik.
+    Sesuai Tabel 1 & Section 2.3 Fan et al. (2021, Sensors).
     """
 
     def __init__(
@@ -66,45 +73,42 @@ class ECGMultiTaskBiLSTM(nn.Module):
         input_size: int = 1,
         hidden_size: int = 256,
         num_layers: int = 2,
-        lstm_dropout: float = 0.3,
-        head_dropout: float = 0.2,
-        pooling: str = "last"  # "last" atau "mean"
+        dropout: float = 0.0,
     ):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.pooling = pooling
 
-        # Shared BiLSTM Encoder
+        # Shared BiLSTM Encoder (Tabel 1 Fan et al., 2021)
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
             bidirectional=True,
-            dropout=lstm_dropout if num_layers > 1 else 0.0,
+            dropout=dropout if num_layers > 1 else 0.0,
         )
 
-        # Dimensi output BiLSTM (2 * hidden_size karena bidirectional)
-        encoder_out_dim = hidden_size * 2  # 256 * 2 = 512
+        # Dimensi output BiLSTM (2 * hidden_size karena bidirectional: 256 * 2 = 512)
+        encoder_out_dim = hidden_size * 2
 
         # 3 Dedicated Task Heads (2 hidden layers: 512 -> 256 -> 1 sesuai Fan et al. 2021)
         fc1_dim = encoder_out_dim if encoder_out_dim != 512 else 512
         fc2_dim = encoder_out_dim // 2 if encoder_out_dim != 512 else 256
         self.sbp_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=head_dropout
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=dropout
         )
         self.dbp_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=head_dropout
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=dropout
         )
         self.map_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=head_dropout
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=dropout
         )
 
     def extract_features(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Mengekstrak representasi fitur dari Shared BiLSTM Encoder.
+        Mengekstrak representasi fitur terminal dari Shared BiLSTM Encoder.
 
         Parameters
         ----------
@@ -117,15 +121,10 @@ class ECGMultiTaskBiLSTM(nn.Module):
         # lstm_out shape: [batch, seq_len, 2 * hidden_size]
         lstm_out, _ = self.lstm(x)
 
-        if self.pooling == "mean":
-            # Global Average Pooling sepanjang sequence
-            features = torch.mean(lstm_out, dim=1)  # [batch, 512]
-        else:
-            # Default: Ambil last hidden state dari forward & backward
-            # (lstm_out[:, -1, :hidden_size] untuk forward, lstm_out[:, 0, hidden_size:] untuk backward)
-            fwd_last = lstm_out[:, -1, : self.hidden_size]
-            bwd_first = lstm_out[:, 0, self.hidden_size :]
-            features = torch.cat([fwd_last, bwd_first], dim=-1)  # [batch, 512]
+        # Ekstraksi terminal state: forward akhir dan backward awal (Fan et al., 2021)
+        fwd_last = lstm_out[:, -1, : self.hidden_size]
+        bwd_first = lstm_out[:, 0, self.hidden_size :]
+        features = torch.cat([fwd_last, bwd_first], dim=-1)  # [batch, 512]
 
         return features
 
