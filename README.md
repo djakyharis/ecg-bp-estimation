@@ -59,6 +59,11 @@ jupyter notebook notebooks/01_visualisasi_dataset_kachuee.ipynb
 
 # 4. Run tests
 pytest tests/ -v
+
+# 5. Train model on GPU (with Auto-Resume & SSH Fault-Tolerance)
+python src/train.py --parts all --epochs 50 --batch-size 128 --device cuda --auto-resume
+
+# For full remote server & SSH guidelines, see: docs/GPU_TRAINING_WORKFLOW.md
 ```
 
 ---

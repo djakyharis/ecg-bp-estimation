@@ -1,0 +1,52 @@
+{
+  "test_samples": 10,
+  "results": {
+    "SBP": {
+      "MAE": 160.30258178710938,
+      "STD": 13.627166748046875,
+      "ME": -160.30258178710938,
+      "RMSE": 160.88075256347656,
+      "BHS_p5": 0.0,
+      "BHS_p10": 0.0,
+      "BHS_p15": 0.0,
+      "BHS_Grade": "D",
+      "AAMI_Pass": false
+    },
+    "DBP": {
+      "MAE": 76.67965698242188,
+      "STD": 9.558948516845703,
+      "ME": -76.67965698242188,
+      "RMSE": 77.2731704711914,
+      "BHS_p5": 0.0,
+      "BHS_p10": 0.0,
+      "BHS_p15": 0.0,
+      "BHS_Grade": "D",
+      "AAMI_Pass": false
+    },
+    "MAP": {
+      "MAE": 99.67909240722656,
+      "STD": 8.441679000854492,
+      "ME": -99.67909240722656,
+      "RMSE": 100.03591918945312,
+      "BHS_p5": 0.0,
+      "BHS_p10": 0.0,
+      "BHS_p15": 0.0,
+      "BHS_Grade": "D",
+      "AAMI_Pass": false
+    }
+  },
+  "avg_mae": 112.22044372558594,
+  "best_val_mae": 98.49318186442058,
+  "hyperparameters": {
+    "batch_size": 32,
+    "num_epochs": 1,
+    "lr": 0.0008,
+    "optimizer": "sgd",
+    "momentum": 0.9,
+    "weight_decay": 0.1,
+    "lstm_dropout": 0.3,
+    "fc_dropout": 0.2,
+    "grad_clip": 5.0,
+    "mixed_precision_amp": false
+  }
+}

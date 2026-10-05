@@ -185,3 +185,24 @@ class AdaptiveMultiTaskLoss(nn.Module):
             "weight_dbp": float(self.weights[1].item()),
             "weight_map": float(self.weights[2].item()),
         }
+
+    def get_state(self) -> Dict[str, any]:
+        """Menyimpan status bobot dan tren validasi untuk checkpointing."""
+        return {
+            "weights": self.weights.detach().cpu().clone(),
+            "prev_val_mean": self.prev_val_mean.copy() if self.prev_val_mean is not None else None,
+            "prev_val_std": self.prev_val_std.copy() if self.prev_val_std is not None else None,
+        }
+
+    def load_state(self, state: Dict[str, any]) -> None:
+        """Memulihkan status bobot dan tren validasi saat melanjutkan training (resume)."""
+        if "weights" in state and state["weights"] is not None:
+            w = state["weights"]
+            if not isinstance(w, torch.Tensor):
+                w = torch.tensor(w, dtype=torch.float32)
+            self.weights.copy_(w.to(device=self.weights.device))
+        if "prev_val_mean" in state and state["prev_val_mean"] is not None:
+            self.prev_val_mean = np.array(state["prev_val_mean"], dtype=float)
+        if "prev_val_std" in state and state["prev_val_std"] is not None:
+            self.prev_val_std = np.array(state["prev_val_std"], dtype=float)
+

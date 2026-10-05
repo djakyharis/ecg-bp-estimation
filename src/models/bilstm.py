@@ -74,11 +74,18 @@ class ECGMultiTaskBiLSTM(nn.Module):
         hidden_size: int = 256,
         num_layers: int = 2,
         dropout: float = 0.0,
+        lstm_dropout: Optional[float] = None,
+        fc_dropout: Optional[float] = None,
     ):
         super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+
+        eff_lstm_dropout = lstm_dropout if lstm_dropout is not None else dropout
+        eff_fc_dropout = fc_dropout if fc_dropout is not None else dropout
+        self.lstm_dropout = eff_lstm_dropout
+        self.fc_dropout = eff_fc_dropout
 
         # Shared BiLSTM Encoder (Tabel 1 Fan et al., 2021)
         self.lstm = nn.LSTM(
@@ -87,7 +94,7 @@ class ECGMultiTaskBiLSTM(nn.Module):
             num_layers=num_layers,
             batch_first=True,
             bidirectional=True,
-            dropout=dropout if num_layers > 1 else 0.0,
+            dropout=eff_lstm_dropout if num_layers > 1 else 0.0,
         )
 
         # Dimensi output BiLSTM (2 * hidden_size karena bidirectional: 256 * 2 = 512)
@@ -97,13 +104,13 @@ class ECGMultiTaskBiLSTM(nn.Module):
         fc1_dim = encoder_out_dim if encoder_out_dim != 512 else 512
         fc2_dim = encoder_out_dim // 2 if encoder_out_dim != 512 else 256
         self.sbp_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=dropout
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=eff_fc_dropout
         )
         self.dbp_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=dropout
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=eff_fc_dropout
         )
         self.map_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=dropout
+            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=eff_fc_dropout
         )
 
     def extract_features(self, x: torch.Tensor) -> torch.Tensor:

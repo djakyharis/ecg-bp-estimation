@@ -37,7 +37,7 @@ def test_bilstm_forward_pass_shape():
 def test_adaptive_multi_task_loss_backward():
     """Memverifikasi perhitungan loss adaptif dan kalkulasi gradien backward pass."""
     model = ECGMultiTaskBiLSTM(input_size=1, hidden_size=32, num_layers=1)
-    criterion = AdaptiveMultiTaskLoss(loss_fn_type="mae", init_log_var=0.0)
+    criterion = AdaptiveMultiTaskLoss(loss_fn_type="mae")
 
     x = torch.randn(8, 1250, 1)
     targets = torch.tensor([[120.0, 80.0, 93.3]] * 8, dtype=torch.float32)
@@ -54,7 +54,6 @@ def test_adaptive_multi_task_loss_backward():
     # Test backward pass
     total_loss.backward()
     assert model.lstm.weight_ih_l0.grad is not None
-    assert criterion.log_var_sbp.grad is not None
 
 
 def test_dataset_and_dataloaders():
