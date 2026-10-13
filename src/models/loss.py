@@ -29,15 +29,26 @@ class AdaptiveMultiTaskLoss(nn.Module):
     sesuai Paper Acuan Fan et al. (2021, Sensors) Algorithm 1.
     """
 
-    def __init__(self, loss_fn_type: str = "mae"):
+    def __init__(
+        self,
+        loss_fn_type: str = "mae",
+        min_weight: float = 0.15,
+        momentum: float = 0.70,
+    ):
         """
         Parameters
         ----------
         loss_fn_type : str, optional
-            Tipe loss regresi: 'mae' (L1Loss) atau 'mse' (MSELoss), default 'mae'.
+            Tipe loss regresi: 'mae' (L1Loss), 'mse' (MSELoss), 'smooth_l1' (Huber), default 'mae'.
+        min_weight : float, optional
+            Batas bawah bobot minimum tugas (default: 0.15) untuk mencegah weight collapse ke 0.
+        momentum : float, optional
+            Faktor smoothing eksponensial antarepoch (default: 0.70) untuk meredam osilasi liar.
         """
         super().__init__()
         self.loss_fn_type = loss_fn_type
+        self.min_weight = min_weight
+        self.momentum = momentum
 
         # Inisialisasi bobot tugas: theta_i = 1/3 (Fan et al., 2021 Algorithm 1 Step 1)
         self.register_buffer("weights", torch.tensor([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], dtype=torch.float32))
@@ -49,6 +60,10 @@ class AdaptiveMultiTaskLoss(nn.Module):
     def _compute_single_loss(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         if self.loss_fn_type == "mse":
             return F.mse_loss(pred, target)
+        elif self.loss_fn_type == "rmse":
+            return torch.sqrt(F.mse_loss(pred, target) + 1e-8)
+        elif self.loss_fn_type == "smooth_l1":
+            return F.smooth_l1_loss(pred, target, beta=1.0)
         else:
             return F.l1_loss(pred, target)
 
@@ -172,6 +187,17 @@ class AdaptiveMultiTaskLoss(nn.Module):
                 norm_weights = raw_weights / sum_raw
             else:
                 norm_weights = np.array([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0])
+
+            # Stabilisasi 1: Batas Bawah Bobot (Floor) agar tidak ada tugas yang diabaikan (weight=0)
+            if self.min_weight > 0.0:
+                norm_weights = np.maximum(norm_weights, self.min_weight)
+                norm_weights = norm_weights / np.sum(norm_weights)
+
+            # Stabilisasi 2: Exponential Moving Average (Momentum) untuk meredam osilasi antarepoch
+            if self.momentum > 0.0:
+                old_w = self.weights.detach().cpu().numpy()
+                norm_weights = self.momentum * old_w + (1.0 - self.momentum) * norm_weights
+                norm_weights = norm_weights / np.sum(norm_weights)
 
             # Update buffer weights di PyTorch
             self.weights.copy_(torch.tensor(norm_weights, dtype=torch.float32, device=self.weights.device))

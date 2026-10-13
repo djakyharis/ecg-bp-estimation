@@ -13,7 +13,7 @@
 
 MODE=${1:-"tmux"}
 PARTS=${2:-"all"}
-EPOCHS=${3:-"50"}
+EPOCHS=${3:-"500"}
 BATCH_SIZE=${4:-"128"}
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -40,6 +40,9 @@ CMD="PYTHONPATH=. $PYTHON_EXEC src/train.py \
     --lr 8e-4 \
     --momentum 0.9 \
     --weight-decay 0.1 \
+    --loss-fn rmse \
+    --loss-min-weight 0.15 \
+    --loss-momentum 0.70 \
     --device auto \
     --amp \
     --auto-resume \

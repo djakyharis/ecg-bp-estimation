@@ -1,0 +1,68 @@
+{
+  "test_samples": 26113,
+  "results": {
+    "SBP": {
+      "MAE": 18.189939498901367,
+      "STD": 22.391677856445312,
+      "ME": -2.6277201175689697,
+      "RMSE": 22.545333862304688,
+      "P_le_5": 16.40945123118753,
+      "P_le_10": 32.88400413587102,
+      "P_le_15": 47.94163826446597,
+      "BHS_Grade": "D",
+      "AAMI_Pass": false
+    },
+    "DBP": {
+      "MAE": 9.05002498626709,
+      "STD": 11.742912292480469,
+      "ME": -2.237001657485962,
+      "RMSE": 11.954085350036621,
+      "P_le_5": 35.212346340903,
+      "P_le_10": 64.82211925094781,
+      "P_le_15": 84.5172902385785,
+      "BHS_Grade": "D",
+      "AAMI_Pass": false
+    },
+    "MAP": {
+      "MAE": 10.743551254272461,
+      "STD": 13.556971549987793,
+      "ME": -2.464045286178589,
+      "RMSE": 13.779078483581543,
+      "P_le_5": 29.571477807988355,
+      "P_le_10": 55.08750430819899,
+      "P_le_15": 75.24987554091832,
+      "BHS_Grade": "D",
+      "AAMI_Pass": false
+    }
+  },
+  "avg_mae": 12.661171913146973,
+  "best_epoch": 15,
+  "best_val_mae": 12.606798350421434,
+  "hyperparameters": {
+    "data_dir": "/mnt/nas-hpg9/djakyharis/ecg-bp-estimation/data/processed",
+    "parts": "all",
+    "checkpoint_dir": "/mnt/nas-hpg9/djakyharis/ecg-bp-estimation/checkpoints",
+    "output_dir": null,
+    "log_file": "/mnt/nas-hpg9/djakyharis/ecg-bp-estimation/checkpoints/train.log",
+    "batch_size": 128,
+    "epochs": 50,
+    "lr": 0.0008,
+    "optimizer": "sgd",
+    "momentum": 0.9,
+    "weight_decay": 0.1,
+    "grad_clip": 5.0,
+    "scheduler_factor": 0.9,
+    "scheduler_patience": 4,
+    "hidden_size": 256,
+    "num_layers": 2,
+    "lstm_dropout": 0.3,
+    "fc_dropout": 0.2,
+    "device": "auto",
+    "amp": true,
+    "num_workers": 8,
+    "max_samples": null,
+    "seed": 42,
+    "resume": null,
+    "auto_resume": true
+  }
+}

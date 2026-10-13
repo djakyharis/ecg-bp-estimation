@@ -63,7 +63,7 @@ class PathConfig:
     # Kaggle — Kachuee Cuff-Less Blood Pressure Dataset
     # https://www.kaggle.com/datasets/mkachuee/BloodPressureDataset
     kaggle_dataset_slug: str = "mkachuee/BloodPressureDataset"
-    kachuee_mat_dir: str = "data/raw/kachuee_mat"   # folder .mat files lokal
+    kachuee_mat_dir: str = "data/kachuee_mat"   # folder .mat files lokal
 
 
 @dataclass

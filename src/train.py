@@ -45,6 +45,7 @@ if PROJECT_ROOT not in sys.path:
 from src.models.bilstm import ECGMultiTaskBiLSTM
 from src.models.loss import AdaptiveMultiTaskLoss
 from src.models.dataset import ECGBPDataset
+from src.preprocessing.kachuee_preprocessor import preprocess_kachuee_part
 
 
 # ── Global State untuk Penanganan Sinyal SSH (SIGHUP/SIGINT) ──────────────────
@@ -146,24 +147,79 @@ def load_dataset_parts(
     max_samples: Optional[int] = None,
     logger: Optional[logging.Logger] = None
 ) -> ECGBPDataset:
-    """Memuat berkas .npz berdasarkan spesifikasi part."""
+    """
+    Memuat dataset sinyal ECG & BP ground truth.
+    Mendukung alur End-to-End: Jika berkas .npz preprocessed belum tersedia di folder
+    tujuan (data/processed), fungsi ini otomatis memproses berkas mentah .mat dari
+    folder data/kachuee_mat/ secara transparan.
+    """
     log_fn = logger.info if logger else print
     warn_fn = logger.warning if logger else print
 
+    processed_dir = data_dir
+    # Deteksi lokasi file mentah kachuee_mat
+    kachuee_mat_dir = os.path.join(PROJECT_ROOT, "data", "kachuee_mat")
+    if os.path.basename(os.path.normpath(data_dir)) == "kachuee_mat":
+        processed_dir = os.path.join(PROJECT_ROOT, "data", "processed")
+        kachuee_mat_dir = data_dir
+
+    os.makedirs(processed_dir, exist_ok=True)
+
+    # Identifikasi part yang diminta
     if parts_spec.strip().lower() == "all":
-        file_paths = sorted(glob.glob(os.path.join(data_dir, "*_preprocessed.npz")))
+        # Cari semua part dari .npz atau dari .mat jika .npz belum lengkap
+        mat_candidates = sorted(glob.glob(os.path.join(kachuee_mat_dir, "part_*.mat")))
+        if mat_candidates:
+            part_nums = [
+                os.path.splitext(os.path.basename(p))[0].replace("part_", "")
+                for p in mat_candidates
+            ]
+        else:
+            npz_candidates = sorted(glob.glob(os.path.join(processed_dir, "*_preprocessed.npz")))
+            part_nums = [
+                os.path.splitext(os.path.basename(p))[0].replace("part_", "").replace("_preprocessed", "")
+                for p in npz_candidates
+            ]
     else:
         part_nums = [p.strip() for p in parts_spec.split(",") if p.strip()]
-        file_paths = []
-        for p in part_nums:
-            target = os.path.join(data_dir, f"part_{p}_preprocessed.npz")
-            if os.path.exists(target):
-                file_paths.append(target)
-            else:
-                warn_fn(f"[Peringatan] Berkas part tidak ditemukan: {target}")
+
+    file_paths = []
+    for p in part_nums:
+        npz_target = os.path.join(processed_dir, f"part_{p}_preprocessed.npz")
+        mat_target = os.path.join(kachuee_mat_dir, f"part_{p}.mat")
+
+        if os.path.exists(npz_target):
+            file_paths.append(npz_target)
+        elif os.path.exists(mat_target):
+            log_fn(f"🔄 Berkas preprocessed belum ada: {npz_target}")
+            log_fn(f"⚡ Menjalankan alur End-to-End Pra-Pemrosesan untuk Part {p} dari: {mat_target}...")
+            
+            # Jika hanya smoke-test (max_samples <= 500) dan .npz belum ada, proses secara cepat
+            is_smoke_test = (max_samples is not None and max_samples <= 500)
+            max_epochs_to_proc = max(max_samples * 2, 200) if is_smoke_test else None
+            
+            out_file = npz_target if not is_smoke_test else os.path.join(processed_dir, f"part_{p}_smoke_preprocessed.npz")
+            if is_smoke_test and os.path.exists(out_file):
+                file_paths.append(out_file)
+                continue
+
+            preprocess_kachuee_part(
+                mat_path=mat_target,
+                output_npz_path=out_file,
+                epoch_len=1250,
+                fs=125.0,
+                max_epochs=max_epochs_to_proc,
+                logger=logger,
+            )
+            file_paths.append(out_file)
+        else:
+            warn_fn(f"[Peringatan] Berkas data untuk Part {p} tidak ditemukan di {npz_target} maupun {mat_target}")
 
     if not file_paths:
-        raise FileNotFoundError(f"Tidak ada berkas .npz yang cocok di {data_dir} dengan spesifikasi '{parts_spec}'")
+        raise FileNotFoundError(
+            f"Tidak ada berkas data yang cocok dengan spesifikasi parts '{parts_spec}'. "
+            f"Pastikan file .mat tersedia di '{kachuee_mat_dir}' atau .npz di '{processed_dir}'."
+        )
 
     log_fn(f"Memuat {len(file_paths)} berkas dataset preprocessed...")
     for fp in file_paths:
@@ -557,7 +613,7 @@ def main():
 
     # Hyperparameter Sesuai Paper Fan et al. (2021) & Notebook 06
     parser.add_argument("--batch-size", type=int, default=128, help="Ukuran batch (Fan et al. 2021: 128)")
-    parser.add_argument("--epochs", type=int, default=15, help="Jumlah total epoch (Gunakan 30-500 sesuai kebutuhan)")
+    parser.add_argument("--epochs", type=int, default=500, help="Jumlah total epoch (Fan et al. 2021: 500)")
     parser.add_argument("--lr", type=float, default=8e-4, help="Learning rate (Fan et al. 2021: 0.0008)")
     parser.add_argument("--optimizer", type=str, default="sgd", choices=["sgd", "adamw"], help="Optimizer: 'sgd' (Fan et al. 2021 Momentum-SGD) atau 'adamw'")
     parser.add_argument("--momentum", type=float, default=0.9, help="Momentum untuk SGD (Fan et al. 2021: 0.9)")
@@ -565,6 +621,9 @@ def main():
     parser.add_argument("--grad-clip", type=float, default=5.0, help="Gradient clipping norm")
     parser.add_argument("--scheduler-factor", type=float, default=0.9, help="ReduceLROnPlateau decay factor")
     parser.add_argument("--scheduler-patience", type=int, default=4, help="ReduceLROnPlateau patience")
+    parser.add_argument("--loss-fn", type=str, default="rmse", choices=["rmse", "mae", "mse", "smooth_l1"], help="Fungsi loss pelatihan (Fan et al. 2021: rmse, default: rmse)")
+    parser.add_argument("--loss-min-weight", type=float, default=0.15, help="Batas bawah bobot minimum tugas adaptif (default: 0.15)")
+    parser.add_argument("--loss-momentum", type=float, default=0.70, help="Faktor smoothing momentum antarepoch bobot adaptif (default: 0.70)")
 
     # Arsitektur BiLSTM (Tabel 1 Fan et al., 2021)
     parser.add_argument("--hidden-size", type=int, default=256, help="Hidden units per arah BiLSTM (output concat: 512)")
@@ -677,20 +736,38 @@ def main():
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"✅ Inisialisasi Model: {total_params:,} parameter terlatih")
 
-    criterion = AdaptiveMultiTaskLoss(loss_fn_type="mae").to(device)
+    criterion = AdaptiveMultiTaskLoss(
+        loss_fn_type=args.loss_fn,
+        min_weight=args.loss_min_weight,
+        momentum=args.loss_momentum,
+    ).to(device)
+
+    # Pisahkan parameter weight decay: jangan kenakan weight decay pada bias (mencegah penarikan paksa ke 0)
+    decay_params = []
+    no_decay_params = []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if "bias" in name or param.ndim <= 1:
+            no_decay_params.append(param)
+        else:
+            decay_params.append(param)
+
+    param_groups = [
+        {"params": decay_params, "weight_decay": args.weight_decay},
+        {"params": no_decay_params, "weight_decay": 0.0},
+    ]
 
     if args.optimizer == "sgd":
         optimizer = torch.optim.SGD(
-            model.parameters(),
+            param_groups,
             lr=args.lr,
             momentum=args.momentum,
-            weight_decay=args.weight_decay,
         )
     else:
         optimizer = torch.optim.AdamW(
-            model.parameters(),
+            param_groups,
             lr=args.lr,
-            weight_decay=args.weight_decay,
         )
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -763,11 +840,10 @@ def main():
             update_adaptive_weights=True,
         )
 
-        scheduler.step(val_res["loss"])
+        avg_val_mae = (val_res["mae_sbp"] + val_res["mae_dbp"] + val_res["mae_map"]) / 3.0
+        scheduler.step(avg_val_mae)
         lr_now = optimizer.param_groups[0]["lr"]
         elapsed = time.time() - t0
-
-        avg_val_mae = (val_res["mae_sbp"] + val_res["mae_dbp"] + val_res["mae_map"]) / 3.0
 
         history["train_loss"].append(train_res["loss"])
         history["val_loss"].append(val_res["loss"])

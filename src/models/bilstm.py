@@ -113,6 +113,18 @@ class ECGMultiTaskBiLSTM(nn.Module):
             in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=eff_fc_dropout
         )
 
+        self._init_weights()
+
+    def _init_weights(self):
+        """Inisialisasi bobot dan prior bias fisiologis (SBP~120, DBP~80, MAP~93.3 mmHg)."""
+        # Set prior bias fisiologis pada layer regresi output akhir
+        if hasattr(self.sbp_head.net[-1], "bias") and self.sbp_head.net[-1].bias is not None:
+            nn.init.constant_(self.sbp_head.net[-1].bias, 120.0)
+        if hasattr(self.dbp_head.net[-1], "bias") and self.dbp_head.net[-1].bias is not None:
+            nn.init.constant_(self.dbp_head.net[-1].bias, 80.0)
+        if hasattr(self.map_head.net[-1], "bias") and self.map_head.net[-1].bias is not None:
+            nn.init.constant_(self.map_head.net[-1].bias, 93.3)
+
     def extract_features(self, x: torch.Tensor) -> torch.Tensor:
         """
         Mengekstrak representasi fitur terminal dari Shared BiLSTM Encoder.
