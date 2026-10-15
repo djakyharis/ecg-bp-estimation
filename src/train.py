@@ -663,8 +663,8 @@ def main():
     # Arsitektur BiLSTM (Tabel 1 Fan et al., 2021)
     parser.add_argument("--hidden-size", type=int, default=256, help="Hidden units per arah BiLSTM (output concat: 512)")
     parser.add_argument("--num-layers", type=int, default=2, help="Jumlah layer BiLSTM")
-    parser.add_argument("--lstm-dropout", type=float, default=0.3, help="Dropout antar layer LSTM")
-    parser.add_argument("--fc-dropout", type=float, default=0.2, help="Dropout pada FC heads")
+    parser.add_argument("--lstm-dropout", type=float, default=0.0, help="Dropout antar layer LSTM (Fan et al. 2021: 0.0)")
+    parser.add_argument("--fc-dropout", type=float, default=0.0, help="Dropout pada FC heads (Fan et al. 2021: 0.0)")
 
     # Optimasi GPU & Sistem
     parser.add_argument("--device", type=str, default="auto", help="'auto', 'cuda', 'mps', atau 'cpu'")

@@ -41,14 +41,14 @@ class ModelConfig:
     # Sharing Layers (BiLSTM)
     bilstm_hidden_units: int = 256  # Output bidirectional = 2 * 256 = 512
     bilstm_num_layers: int = 2
-    bilstm_dropout: float = 0.3
+    bilstm_dropout: float = 0.0     # Fan et al. (2021 Table 1: 0.0)
     
     # Task-Specific FC Heads (SBP, DBP, MAP)
     fc_layers: List[int] = field(default_factory=lambda: [512, 256])
-    fc_dropout: float = 0.2
+    fc_dropout: float = 0.0         # Fan et al. (2021 Table 1: 0.0)
     
-    # Adaptive Weight Learning
-    init_task_weights: List[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
+    # Adaptive Weight Learning (Fan et al., 2021 Algorithm 1)
+    init_task_weights: List[float] = field(default_factory=lambda: [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0])
 
 
 @dataclass
