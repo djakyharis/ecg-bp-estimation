@@ -94,7 +94,7 @@ def test_aha_blood_pressure_classification():
 
 
 def test_end_to_end_inference_predictor():
-    """Memverifikasi alur inferensi terpadu dari sinyal ECG mentah."""
+    """Memverifikasi alur inferensi terpadu dari sinyal ECG mentah (baseline)."""
     raw_ecg = np.random.randn(1500)  # Sinyal mentah 1500 sampel
     predictor = ECGBPPredictor()
 
@@ -106,3 +106,24 @@ def test_end_to_end_inference_predictor():
     assert "clean_ecg" in result
     assert "clinical" in result
     assert len(result["clean_ecg"]) == 1250
+
+
+def test_end_to_end_inference_predictor_hybrid():
+    """Memverifikasi alur inferensi terpadu model hybrid (dengan ekstraksi 12 fitur)."""
+    hybrid_model = ECGMultiTaskBiLSTM(
+        input_size=1, hidden_size=64, num_layers=1,
+        sbp_feat_dim=6, dbp_feat_dim=6, map_feat_dim=12
+    )
+    predictor = ECGBPPredictor(model=hybrid_model)
+    raw_ecg = np.random.randn(1500)
+
+    result = predictor.predict(raw_ecg, input_fs=125.0)
+
+    assert "sbp" in result
+    assert "dbp" in result
+    assert "map" in result
+    assert isinstance(result["sbp"], float)
+    assert isinstance(result["dbp"], float)
+    assert isinstance(result["map"], float)
+    assert "clinical" in result
+

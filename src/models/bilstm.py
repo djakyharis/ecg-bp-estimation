@@ -9,7 +9,7 @@ Sesuai rancangan skripsi dan ARCHITECTURE.md:
       * MAP Head: Linear(512 -> 512) -> ReLU -> Dropout(0.2) -> Linear(512 -> 256) -> ReLU -> Dropout(0.2) -> Linear(256 -> 1)
 """
 
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Union
 import torch
 import torch.nn as nn
 

@@ -26,7 +26,7 @@ Partisi Fitur Fisiologis:
       MAP ≈ DBP + 1/3 (SBP - DBP).
 """
 
-from typing import Dict, List, Tuple, Optional, Union
+from typing import Dict, List, Tuple, Optional, Union, Any
 import numpy as np
 import torch
 
