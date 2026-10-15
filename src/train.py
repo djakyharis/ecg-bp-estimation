@@ -46,6 +46,13 @@ from src.models.bilstm import ECGMultiTaskBiLSTM
 from src.models.loss import AdaptiveMultiTaskLoss
 from src.models.dataset import ECGBPDataset
 from src.preprocessing.kachuee_preprocessor import preprocess_kachuee_part
+from src.features.statistical import (
+    extract_statistical_features,
+    FeatureStandardScaler,
+    SBP_FEATURE_NAMES,
+    DBP_FEATURE_NAMES,
+    ALL_FEATURE_NAMES,
+)
 
 
 # ── Global State untuk Penanganan Sinyal SSH (SIGHUP/SIGINT) ──────────────────
@@ -54,6 +61,7 @@ TRAINING_STATE = {
     "optimizer": None,
     "scheduler": None,
     "scaler": None,
+    "feature_scaler": None,
     "criterion": None,
     "epoch": 0,
     "best_val_mae": float("inf"),
@@ -80,6 +88,7 @@ def register_signal_handlers(logger: logging.Logger):
             best_val_mae=TRAINING_STATE["best_val_mae"],
             history=TRAINING_STATE["history"],
             args=TRAINING_STATE["args"],
+            feature_scaler=TRAINING_STATE["feature_scaler"],
             logger=logger,
         )
         logger.warning("✅ Checkpoint darurat berhasil disimpan. Anda dapat melanjutkan training via --resume.")
@@ -243,6 +252,7 @@ def save_checkpoint(
     best_val_mae: float,
     history: Dict[str, list],
     args: argparse.Namespace,
+    feature_scaler: Optional[Any] = None,
     logger: Optional[logging.Logger] = None
 ):
     """Menyimpan checkpoint lengkap (model, optimizer, scheduler, scaler, status loss, dan riwayat)."""
@@ -256,6 +266,7 @@ def save_checkpoint(
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
         "scaler_state_dict": scaler.state_dict() if scaler else None,
+        "feature_scaler_state": feature_scaler.state_dict() if feature_scaler else None,
         "criterion_state": criterion.get_state(),
         "best_val_mae": best_val_mae,
         "history": history,
@@ -283,6 +294,7 @@ def load_checkpoint(
     scaler: Optional[Any],
     criterion: AdaptiveMultiTaskLoss,
     device: torch.device,
+    feature_scaler: Optional[Any] = None,
     logger: Optional[logging.Logger] = None
 ) -> Tuple[int, float, Dict[str, list]]:
     """Memulihkan proses training dari checkpoint (Resume)."""
@@ -298,6 +310,9 @@ def load_checkpoint(
 
     if scaler and ckpt.get("scaler_state_dict"):
         scaler.load_state_dict(ckpt["scaler_state_dict"])
+
+    if feature_scaler and ckpt.get("feature_scaler_state"):
+        feature_scaler.load_state_dict(ckpt["feature_scaler_state"])
 
     if "criterion_state" in ckpt:
         criterion.load_state(ckpt["criterion_state"])
@@ -330,7 +345,14 @@ def train_one_epoch(
     n_batches = 0
     use_cuda = device.type == "cuda"
 
-    for x_batch, y_batch in dataloader:
+    for batch in dataloader:
+        if len(batch) == 3:
+            x_batch, y_batch, feat_batch = batch
+            feat_batch = {k: v.to(device, non_blocking=use_cuda) for k, v in feat_batch.items()}
+        else:
+            x_batch, y_batch = batch
+            feat_batch = None
+
         x_batch = x_batch.to(device, non_blocking=use_cuda)
         y_batch = y_batch.to(device, non_blocking=use_cuda)
 
@@ -338,7 +360,7 @@ def train_one_epoch(
 
         if scaler is not None:
             with torch.amp.autocast(device_type="cuda", enabled=use_cuda):
-                sbp_pred, dbp_pred, map_pred = model(x_batch)
+                sbp_pred, dbp_pred, map_pred = model(x_batch, features=feat_batch)
                 loss, metrics = criterion(sbp_pred, dbp_pred, map_pred, y_batch)
 
             scaler.scale(loss).backward()
@@ -347,7 +369,7 @@ def train_one_epoch(
             scaler.step(optimizer)
             scaler.update()
         else:
-            sbp_pred, dbp_pred, map_pred = model(x_batch)
+            sbp_pred, dbp_pred, map_pred = model(x_batch, features=feat_batch)
             loss, metrics = criterion(sbp_pred, dbp_pred, map_pred, y_batch)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip)
@@ -382,11 +404,18 @@ def evaluate(
     n_batches = 0
     use_cuda = device.type == "cuda"
 
-    for x_batch, y_batch in dataloader:
+    for batch in dataloader:
+        if len(batch) == 3:
+            x_batch, y_batch, feat_batch = batch
+            feat_batch = {k: v.to(device, non_blocking=use_cuda) for k, v in feat_batch.items()}
+        else:
+            x_batch, y_batch = batch
+            feat_batch = None
+
         x_batch = x_batch.to(device, non_blocking=use_cuda)
         y_batch = y_batch.to(device, non_blocking=use_cuda)
 
-        sbp_pred, dbp_pred, map_pred = model(x_batch)
+        sbp_pred, dbp_pred, map_pred = model(x_batch, features=feat_batch)
         loss, metrics = criterion(sbp_pred, dbp_pred, map_pred, y_batch)
 
         total_loss += metrics["loss_total"]
@@ -427,8 +456,14 @@ def evaluate_test_set_full(
 
     all_preds, all_trues = [], []
     with torch.no_grad():
-        for x_batch, y_batch in test_loader:
-            preds = model.predict_all(x_batch.to(device))
+        for batch in test_loader:
+            if len(batch) == 3:
+                x_batch, y_batch, feat_batch = batch
+                feat_batch = {k: v.to(device) for k, v in feat_batch.items()}
+            else:
+                x_batch, y_batch = batch
+                feat_batch = None
+            preds = model.predict_all(x_batch.to(device), features=feat_batch)
             all_preds.append(preds.cpu().numpy())
             all_trues.append(y_batch.numpy())
 
@@ -639,6 +674,10 @@ def main():
     parser.add_argument("--max-samples", type=int, default=None, help="Batas maksimal sampel (opsional, untuk smoke-test)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
+    # Fitur Statistik Terpandu (Nour et al. 2022 / Ilham Hakim 2025)
+    parser.add_argument("--use-features", action="store_true", default=True, help="Gunakan 12 fitur statistik terpandu (default: True)")
+    parser.add_argument("--no-features", dest="use_features", action="store_false", help="Nonaktifkan fitur statistik (mode Pure BiLSTM)")
+
     # Mitigasi SSH: Resume Capabilities
     parser.add_argument("--resume", type=str, default=None, help="Jalur checkpoint .pt untuk melanjutkan training")
     parser.add_argument("--auto-resume", action="store_true", default=False, help="Otomatis melanjutkan dari 'last_checkpoint.pt' jika tersedia di folder checkpoint")
@@ -695,6 +734,36 @@ def main():
         generator=torch.Generator().manual_seed(args.seed)
     )
 
+    # Ekstraksi dan Injeksi Fitur Statistik (Nour et al. 2022 / Ilham Hakim 2025)
+    if args.use_features:
+        logger.info("🔍 Mengekstrak 12 Fitur Statistik Terpandu (Nour et al. 2022 / Ilham Hakim 2025)...")
+        raw_x = dataset.X.squeeze(-1).numpy()
+        all_extracted = extract_statistical_features(raw_x)
+
+        # Fit scaler HANYA pada train_set (mencegah data leakage)
+        feature_scaler = FeatureStandardScaler()
+        train_idx = list(train_set.indices)
+        train_feats = {k: v[train_idx] for k, v in all_extracted.items()}
+        feature_scaler.fit(train_feats)
+
+        # Terapkan standarisasi ke seluruh dataset
+        scaled_features = feature_scaler.transform(all_extracted)
+        dataset.set_features(scaled_features)
+
+        sbp_feat_dim = len(SBP_FEATURE_NAMES)
+        dbp_feat_dim = len(DBP_FEATURE_NAMES)
+        map_feat_dim = len(ALL_FEATURE_NAMES)
+        logger.info(
+            f"✅ Mode Hybrid Aktif: SBP Head (+{sbp_feat_dim} fitur) | "
+            f"DBP Head (+{dbp_feat_dim} fitur) | MAP Head (+{map_feat_dim} fitur)"
+        )
+    else:
+        feature_scaler = None
+        sbp_feat_dim = 0
+        dbp_feat_dim = 0
+        map_feat_dim = 0
+        logger.info("ℹ️  Mode Pure BiLSTM Aktif (tanpa injeksi fitur statistik terpandu)")
+
     train_loader = DataLoader(
         train_set,
         batch_size=args.batch_size,
@@ -731,6 +800,9 @@ def main():
         num_layers=args.num_layers,
         lstm_dropout=args.lstm_dropout,
         fc_dropout=args.fc_dropout,
+        sbp_feat_dim=sbp_feat_dim,
+        dbp_feat_dim=dbp_feat_dim,
+        map_feat_dim=map_feat_dim,
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -796,7 +868,8 @@ def main():
 
     if resume_target and os.path.exists(resume_target):
         start_epoch, best_val_mae, history = load_checkpoint(
-            resume_target, model, optimizer, scheduler, scaler, criterion, device, logger
+            resume_target, model, optimizer, scheduler, scaler, criterion, device,
+            feature_scaler=feature_scaler, logger=logger
         )
 
     # Daftarkan state ke signal handler
@@ -805,6 +878,7 @@ def main():
         "optimizer": optimizer,
         "scheduler": scheduler,
         "scaler": scaler,
+        "feature_scaler": feature_scaler,
         "criterion": criterion,
         "epoch": start_epoch,
         "best_val_mae": best_val_mae,
@@ -869,6 +943,7 @@ def main():
                 best_val_mae=best_val_mae,
                 history=history,
                 args=args,
+                feature_scaler=feature_scaler,
                 logger=None,  # Tidak perlu spam log
             )
             mark = "★ BEST"
@@ -888,6 +963,7 @@ def main():
             best_val_mae=best_val_mae,
             history=history,
             args=args,
+            feature_scaler=feature_scaler,
             logger=None,
         )
 

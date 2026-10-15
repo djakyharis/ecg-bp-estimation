@@ -76,6 +76,9 @@ class ECGMultiTaskBiLSTM(nn.Module):
         dropout: float = 0.0,
         lstm_dropout: Optional[float] = None,
         fc_dropout: Optional[float] = None,
+        sbp_feat_dim: int = 0,
+        dbp_feat_dim: int = 0,
+        map_feat_dim: int = 0,
     ):
         super().__init__()
         self.input_size = input_size
@@ -100,17 +103,32 @@ class ECGMultiTaskBiLSTM(nn.Module):
         # Dimensi output BiLSTM (2 * hidden_size karena bidirectional: 256 * 2 = 512)
         encoder_out_dim = hidden_size * 2
 
+        self.sbp_feat_dim = sbp_feat_dim
+        self.dbp_feat_dim = dbp_feat_dim
+        self.map_feat_dim = map_feat_dim
+
         # 3 Dedicated Task Heads (2 hidden layers: 512 -> 256 -> 1 sesuai Fan et al. 2021)
+        # Mendukung Hybrid Architecture: in_features = 512 (BiLSTM) + fitur statistik spesifik
         fc1_dim = encoder_out_dim if encoder_out_dim != 512 else 512
         fc2_dim = encoder_out_dim // 2 if encoder_out_dim != 512 else 256
+
         self.sbp_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=eff_fc_dropout
+            in_features=encoder_out_dim + sbp_feat_dim,
+            hidden_dim1=fc1_dim,
+            hidden_dim2=fc2_dim,
+            dropout=eff_fc_dropout,
         )
         self.dbp_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=eff_fc_dropout
+            in_features=encoder_out_dim + dbp_feat_dim,
+            hidden_dim1=fc1_dim,
+            hidden_dim2=fc2_dim,
+            dropout=eff_fc_dropout,
         )
         self.map_head = TaskSpecificHead(
-            in_features=encoder_out_dim, hidden_dim1=fc1_dim, hidden_dim2=fc2_dim, dropout=eff_fc_dropout
+            in_features=encoder_out_dim + map_feat_dim,
+            hidden_dim1=fc1_dim,
+            hidden_dim2=fc2_dim,
+            dropout=eff_fc_dropout,
         )
 
         self._init_weights()
@@ -147,7 +165,11 @@ class ECGMultiTaskBiLSTM(nn.Module):
 
         return features
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(
+        self,
+        x: torch.Tensor,
+        features: Optional[Union[Dict[str, torch.Tensor], torch.Tensor]] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Forward pass model untuk memprediksi SBP, DBP, dan MAP.
 
@@ -155,23 +177,48 @@ class ECGMultiTaskBiLSTM(nn.Module):
         ----------
         x : torch.Tensor
             Input batch sinyal ECG, shape [batch, 1250, 1] atau [batch, 1250].
+        features : dict atau torch.Tensor, optional
+            Fitur statistik tambahan per tugas {'sbp': [B, 6], 'dbp': [B, 6], 'map': [B, 12]}
+            atau gabungan [B, 12].
 
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
             (sbp_pred, dbp_pred, map_pred) masing-masing shape [batch, 1].
         """
-        features = self.extract_features(x)
+        enc_feat = self.extract_features(x)  # [batch, 512]
 
-        sbp = self.sbp_head(features)
-        dbp = self.dbp_head(features)
-        map_val = self.map_head(features)
+        if features is not None and isinstance(features, dict):
+            sbp_in = torch.cat([enc_feat, features["sbp"]], dim=-1) if self.sbp_feat_dim > 0 and "sbp" in features else enc_feat
+            dbp_in = torch.cat([enc_feat, features["dbp"]], dim=-1) if self.dbp_feat_dim > 0 and "dbp" in features else enc_feat
+            map_in = torch.cat([enc_feat, features["map"]], dim=-1) if self.map_feat_dim > 0 and "map" in features else enc_feat
+        elif features is not None and isinstance(features, torch.Tensor):
+            # Jika berupa tensor utuh [B, 12]
+            f_sbp = features[:, : self.sbp_feat_dim] if self.sbp_feat_dim > 0 else None
+            f_dbp = features[:, self.sbp_feat_dim : self.sbp_feat_dim + self.dbp_feat_dim] if self.dbp_feat_dim > 0 else None
+            f_map = features[:, : self.map_feat_dim] if self.map_feat_dim > 0 else None
+
+            sbp_in = torch.cat([enc_feat, f_sbp], dim=-1) if f_sbp is not None else enc_feat
+            dbp_in = torch.cat([enc_feat, f_dbp], dim=-1) if f_dbp is not None else enc_feat
+            map_in = torch.cat([enc_feat, f_map], dim=-1) if f_map is not None else enc_feat
+        else:
+            sbp_in = enc_feat
+            dbp_in = enc_feat
+            map_in = enc_feat
+
+        sbp = self.sbp_head(sbp_in)
+        dbp = self.dbp_head(dbp_in)
+        map_val = self.map_head(map_in)
 
         return sbp, dbp, map_val
 
-    def predict_all(self, x: torch.Tensor) -> torch.Tensor:
+    def predict_all(
+        self,
+        x: torch.Tensor,
+        features: Optional[Union[Dict[str, torch.Tensor], torch.Tensor]] = None,
+    ) -> torch.Tensor:
         """
         Helper yang mengembalikan tensor gabungan [batch, 3] = [SBP, DBP, MAP].
         """
-        sbp, dbp, map_val = self.forward(x)
+        sbp, dbp, map_val = self.forward(x, features=features)
         return torch.cat([sbp, dbp, map_val], dim=-1)
