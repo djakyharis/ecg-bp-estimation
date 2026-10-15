@@ -11,3 +11,5 @@ seaborn>=0.12.0
 tqdm>=4.65.0
 h5py>=3.8.0
 kagglehub>=0.2.0
+pyserial>=3.5
+pyshimmer>=1.0.0
