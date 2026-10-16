@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from ..preprocessing.pipeline import ECGPreprocessingPipeline
-from ..features.statistical import extract_statistical_features, FeatureStandardScaler
+from ..features.statistical import extract_statistical_features, FeatureStandardScaler, infer_feature_set
 from .bilstm import ECGMultiTaskBiLSTM
 
 
@@ -175,7 +175,8 @@ class ECGBPPredictor:
 
         with torch.no_grad():
             if use_features:
-                feats = extract_statistical_features(clean_epoch)
+                feature_set = infer_feature_set(self.model.map_feat_dim)
+                feats = extract_statistical_features(clean_epoch, feature_set=feature_set)
                 if self.feature_scaler is not None and getattr(self.feature_scaler, "is_fitted", False):
                     feats = self.feature_scaler.transform(feats)
                 features_tensors = {

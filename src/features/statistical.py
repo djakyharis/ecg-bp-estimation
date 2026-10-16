@@ -51,14 +51,71 @@ DBP_FEATURE_NAMES = [
 
 ALL_FEATURE_NAMES = SBP_FEATURE_NAMES + DBP_FEATURE_NAMES
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 13 fitur tambahan (Ranking 6-15, Tabel 3.1 Hakim 2025 / Nour et al. 2022)
+# untuk eksperimen ablasi: 12 fitur teratas vs seluruh 25 fitur.
+#   SBP (+7, amplitudo/energi/puncak): Teager Energy (r=0.23), Maximum (0.23),
+#       Geometric Mean (0.20), Median (0.17), 25% Trimmed Mean (0.08),
+#       50% Trimmed Mean (0.04), Harmonic Mean (0.02)
+#   DBP (+6, dispersi/dinamika/bentuk distribusi): Standard Error (0.23),
+#       IQR (0.22), Mean Absolute Deviation (0.21), Minimum (0.12),
+#       Average Curve Length (0.10), Kurtosis (0.02)
+# ──────────────────────────────────────────────────────────────────────────────
+SBP_EXTRA_FEATURE_NAMES = [
+    "avg_teager_energy",
+    "maximum",
+    "geometric_mean",
+    "median",
+    "trimmed_mean_25",
+    "trimmed_mean_50",
+    "harmonic_mean",
+]
+
+DBP_EXTRA_FEATURE_NAMES = [
+    "standard_error",
+    "iqr",
+    "mean_abs_deviation",
+    "minimum",
+    "avg_curve_length",
+    "kurtosis",
+]
+
+FEATURE_SETS = ("top12", "all25")
+
+
+def get_feature_names(feature_set: str = "top12") -> Dict[str, List[str]]:
+    """Nama fitur per head untuk feature_set 'top12' (12 fitur) atau 'all25' (25 fitur)."""
+    if feature_set == "top12":
+        sbp, dbp = list(SBP_FEATURE_NAMES), list(DBP_FEATURE_NAMES)
+    elif feature_set == "all25":
+        sbp = SBP_FEATURE_NAMES + SBP_EXTRA_FEATURE_NAMES
+        dbp = DBP_FEATURE_NAMES + DBP_EXTRA_FEATURE_NAMES
+    else:
+        raise ValueError(f"feature_set tidak dikenal: {feature_set!r}. Pilihan: {FEATURE_SETS}")
+    return {"sbp": sbp, "dbp": dbp, "map": sbp + dbp}
+
+
+def infer_feature_set(map_feat_dim: int) -> str:
+    """Menentukan feature_set dari dimensi fitur head MAP (12 -> top12, 25 -> all25)."""
+    for fs in FEATURE_SETS:
+        if len(get_feature_names(fs)["map"]) == map_feat_dim:
+            return fs
+    raise ValueError(f"Dimensi fitur MAP {map_feat_dim} tidak cocok dengan feature_set manapun {FEATURE_SETS}")
+
+
 
 def extract_statistical_features(
     ecg_signals: Union[np.ndarray, torch.Tensor],
     eps: float = 1e-8,
+    feature_set: str = "top12",
 ) -> Dict[str, np.ndarray]:
     """
-    Mengekstrak 12 fitur statistik terpandu secara efisien (vectorized)
+    Mengekstrak fitur statistik terpandu secara efisien (vectorized)
     dari array segmen ECG berdimensi [N, 1250] atau [1250].
+
+    feature_set : {'top12', 'all25'}
+        'top12' = 12 fitur Ranking 1-5 (default); 'all25' = seluruh 25 fitur
+        Tabel 3.1 (12 teratas + 13 fitur Ranking 6-15).
 
     Parameters
     ----------
@@ -172,7 +229,14 @@ def extract_statistical_features(
         std_val,         # (N, 1)
     ], axis=-1).astype(np.float32)
 
-    # MAP menerima seluruh 12 fitur gabungan
+    if feature_set == "all25":
+        sbp_feats, dbp_feats = _append_extra_features(
+            x, sbp_feats, dbp_feats, mean_val, std_val, diff_mean, d1, eps
+        )
+    elif feature_set != "top12":
+        raise ValueError(f"feature_set tidak dikenal: {feature_set!r}. Pilihan: {FEATURE_SETS}")
+
+    # MAP menerima seluruh fitur gabungan (SBP + DBP)
     all_feats = np.concatenate([sbp_feats, dbp_feats], axis=-1).astype(np.float32)
 
     return {
@@ -181,6 +245,68 @@ def extract_statistical_features(
         "map": all_feats,
         "all": all_feats,
     }
+
+
+def _append_extra_features(
+    x: np.ndarray,
+    sbp_feats: np.ndarray,
+    dbp_feats: np.ndarray,
+    mean_val: np.ndarray,
+    std_val: np.ndarray,
+    diff_mean: np.ndarray,
+    d1: np.ndarray,
+    eps: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Menambahkan 13 fitur Ranking 6-15 (Tabel 3.1 Hakim 2025 / Nour et al. 2022).
+    Urutan kolom mengikuti SBP_EXTRA_FEATURE_NAMES dan DBP_EXTRA_FEATURE_NAMES.
+    """
+    n = x.shape[-1]
+    # Epsilon lebih besar untuk rata-rata geometrik/harmonik: sinyal ternormalisasi [0,1]
+    # banyak bernilai ~0 sehingga 1/|x| dan log|x| akan meledak.
+    mean_eps = 1e-3
+    abs_x = np.abs(x)
+
+    # ── SBP: amplitudo / energi / puncak ──────────────────────────────────────
+    teager = np.mean(x[:, 1:-1] ** 2 - x[:, :-2] * x[:, 2:], axis=-1, keepdims=True)
+    maximum = np.max(x, axis=-1, keepdims=True)
+    geo_mean = np.exp(np.mean(np.log(abs_x + mean_eps), axis=-1, keepdims=True))
+    median = np.median(x, axis=-1, keepdims=True)
+
+    # Trimmed mean konvensi MATLAB trimmean(x, p): p% total data dibuang (p/2 tiap sisi)
+    x_sorted = np.sort(x, axis=-1)
+
+    def _trimmed_mean(percent_total: float) -> np.ndarray:
+        k = int(round(n * percent_total / 200.0))
+        return np.mean(x_sorted[:, k:n - k], axis=-1, keepdims=True)
+
+    trim25 = _trimmed_mean(25.0)
+    trim50 = _trimmed_mean(50.0)
+    harm_mean = n / np.sum(1.0 / (abs_x + mean_eps), axis=-1, keepdims=True)
+
+    sbp_extra = np.concatenate(
+        [teager, maximum, geo_mean, median, trim25, trim50, harm_mean], axis=-1
+    ).astype(np.float32)
+
+    # ── DBP: dispersi / dinamika / bentuk distribusi ──────────────────────────
+    std_err = std_val / np.sqrt(n)
+    q75, q25 = np.percentile(x, [75, 25], axis=-1)
+    iqr = (q75 - q25).reshape(-1, 1)
+    mad = np.mean(np.abs(diff_mean), axis=-1, keepdims=True)
+    minimum = np.min(x, axis=-1, keepdims=True)
+    curve_len = np.mean(np.abs(d1), axis=-1, keepdims=True)
+    m2 = np.mean(diff_mean ** 2, axis=-1, keepdims=True)
+    m4 = np.mean(diff_mean ** 4, axis=-1, keepdims=True)
+    kurt = np.where(m2 > eps, m4 / (m2 ** 2 + eps), 0.0)
+
+    dbp_extra = np.concatenate(
+        [std_err, iqr, mad, minimum, curve_len, kurt], axis=-1
+    ).astype(np.float32)
+
+    return (
+        np.concatenate([sbp_feats, sbp_extra], axis=-1),
+        np.concatenate([dbp_feats, dbp_extra], axis=-1),
+    )
 
 
 class FeatureStandardScaler:

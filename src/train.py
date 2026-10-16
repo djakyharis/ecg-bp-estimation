@@ -49,6 +49,8 @@ from src.preprocessing.kachuee_preprocessor import preprocess_kachuee_part
 from src.features.statistical import (
     extract_statistical_features,
     FeatureStandardScaler,
+    FEATURE_SETS,
+    get_feature_names,
     SBP_FEATURE_NAMES,
     DBP_FEATURE_NAMES,
     ALL_FEATURE_NAMES,
@@ -677,6 +679,10 @@ def main():
     # Fitur Statistik Terpandu (Nour et al. 2022 / Ilham Hakim 2025)
     parser.add_argument("--use-features", action="store_true", default=True, help="Gunakan 12 fitur statistik terpandu (default: True)")
     parser.add_argument("--no-features", dest="use_features", action="store_false", help="Nonaktifkan fitur statistik (mode Pure BiLSTM)")
+    parser.add_argument(
+        "--feature-set", type=str, default="top12", choices=list(FEATURE_SETS),
+        help="Set fitur: top12 = 12 fitur Ranking 1-5 (default), all25 = seluruh 25 fitur Tabel 3.1 (ablasi)",
+    )
 
     # Mitigasi SSH: Resume Capabilities
     parser.add_argument("--resume", type=str, default=None, help="Jalur checkpoint .pt untuk melanjutkan training")
@@ -736,9 +742,10 @@ def main():
 
     # Ekstraksi dan Injeksi Fitur Statistik (Nour et al. 2022 / Ilham Hakim 2025)
     if args.use_features:
-        logger.info("🔍 Mengekstrak 12 Fitur Statistik Terpandu (Nour et al. 2022 / Ilham Hakim 2025)...")
+        n_feat = len(get_feature_names(args.feature_set)["map"])
+        logger.info(f"🔍 Mengekstrak {n_feat} Fitur Statistik (set '{args.feature_set}', Nour et al. 2022 / Ilham Hakim 2025)...")
         raw_x = dataset.X.squeeze(-1).numpy()
-        all_extracted = extract_statistical_features(raw_x)
+        all_extracted = extract_statistical_features(raw_x, feature_set=args.feature_set)
 
         # Fit scaler HANYA pada train_set (mencegah data leakage)
         feature_scaler = FeatureStandardScaler()
@@ -750,9 +757,10 @@ def main():
         scaled_features = feature_scaler.transform(all_extracted)
         dataset.set_features(scaled_features)
 
-        sbp_feat_dim = len(SBP_FEATURE_NAMES)
-        dbp_feat_dim = len(DBP_FEATURE_NAMES)
-        map_feat_dim = len(ALL_FEATURE_NAMES)
+        feat_names = get_feature_names(args.feature_set)
+        sbp_feat_dim = len(feat_names["sbp"])
+        dbp_feat_dim = len(feat_names["dbp"])
+        map_feat_dim = len(feat_names["map"])
         logger.info(
             f"✅ Mode Hybrid Aktif: SBP Head (+{sbp_feat_dim} fitur) | "
             f"DBP Head (+{dbp_feat_dim} fitur) | MAP Head (+{map_feat_dim} fitur)"
