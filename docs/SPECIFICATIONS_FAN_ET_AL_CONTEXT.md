@@ -7,37 +7,56 @@ Dokumen ini dirancang sebagai **konteks menyeluruh (*system context / prompt inj
 ## 1. Identitas Proyek & Referensi Utama
 
 - **Topik Skripsi**: Estimasi Tekanan Darah Non-Invasif (SBP, DBP, MAP) Kontinu Berbasis Sinyal Elektrokardiogram (ECG) Menggunakan Deep Learning Multi-Task.
-- **Paper Acuan Utama**:  
-  > Xiaomao Fan, Hailiang Wang, Yang Zhao, Ye Li, and Kwok Leung Tsui,  
-  > *"An Adaptive Weight Learning-Based Multitask Deep Network for Continuous Blood Pressure Estimation Using Electrocardiogram Signals"*,  
+- **Paper Acuan Utama**:
+  > Xiaomao Fan, Hailiang Wang, Yang Zhao, Ye Li, and Kwok Leung Tsui,
+  > *"An Adaptive Weight Learning-Based Multitask Deep Network for Continuous Blood Pressure Estimation Using Electrocardiogram Signals"*,
   > **Sensors 2021**, 21(5), 1595. DOI: [10.3390/s21051595](https://doi.org/10.3390/s21051595).
+  >
 
 ---
 
 ## 2. Spesifikasi Asli Paper Fan et al. (2021)
 
-| Aspek | Spesifikasi Resmi Paper Fan et al. (Sensors 2021) |
-|---|---|
-| **Dataset** | PhysioNet MIMIC-II Version 3.0 Waveform Database (21.422 sinyal sinkron ECG Lead II & ABP). |
-| **Data Split** | Random split independen: **80% Training**, **10% Validation**, **10% Testing**. |
-| **Filtering ECG** | **Discrete Wavelet Transform (DWT)** wavelet Daubechies 8 (`db8`) 8 tingkat dekomposisi. Koefisien aproksimasi tingkat ke-8 (0–0,24 Hz) dan detail tingkat ke-1 (31,25–62,5 Hz) dinolkan, lalu direkonstruksi via inverse DWT (pita efektif: 0,24–31,25 Hz). |
-| **Resampling** | Sinyal ECG direkonstruksi di-downsample dari **125 Hz ke 100 Hz**. |
-| **Panjang Jendela** | 10 detik (@ 100 Hz = 1.000 titik sampel). |
-| **Normalisasi ECG** | Min-Max Normalization: $x_{\text{norm}} = \frac{x - x_{\min}}{x_{\max} - x_{\min}} \in [0, 1]$. |
-| **Ekstraksi ABP Ground Truth** | • $\text{SBP} = \max(\text{segmen 10s})$<br>• $\text{DBP} = \min(\text{segmen 10s})$<br>• $\text{MAP} = \frac{\text{SBP} + 2\cdot\text{DBP}}{3}$. |
-| **Quality Assessment ABP** | Skewness index dihitung pada sub-segmen ABP 1 detik *non-overlapping*. Jika ada nilai skewness $< 0$, seluruh segmen 10 detik (ECG & ABP) **dibuang**. |
-| **Struktur Input BiLSTM** | **`Time steps: 50`**, **`Sequence length: 20`** ($50 \times 20 = 1.000$ titik). Sinyal 1.000 sampel di-reshape menjadi matriks $50 \times 20$. |
-| **Shared Backbone** | 2-Layer Bidirectional LSTM (BiLSTM), `hidden_size = 256` per arah (output terminal forward akhir + backward awal di-concat = **512 unit**). |
-| **Task-Specific Heads** | 3 head terpisah (SBP, DBP, MAP) dengan arsitektur identik: <br>`Linear(512 → 512)` → `ReLU` → `Linear(512 → 256)` → `ReLU` → `Linear(256 → 1)`. |
-| **Dropout** | **Tidak ada dropout** (baik pada BiLSTM maupun FC heads). |
-| **Inisialisasi Bobot** | Seluruh bobot dan bias diinisialisasi dari distribusi seragam $U(-\sqrt{d}, \sqrt{d})$ dengan $d = 256$. |
-| **Optimizer** | **Mini-batch SGD with Momentum**: `lr = 0.0008`, `momentum = 0.9`, `batch_size = 128`. |
-| **Regularisasi L2** | **Weight decay = 0.1** pada seluruh bobot dan bias. |
-| **Jumlah Epoch** | **500 Epoch**. |
-| **LR Scheduler** | `ReduceLROnPlateau(mode='min', factor=0.9, patience=4)`. **Dipicu saat Training Loss tidak lagi menurun**. |
-| **Loss Function Training** | **RMSE / Root Mean Square Error** (Caption Gambar 1: *"computing the root mean square loss values"*). |
-| **Adaptive Weight Learning** | Formulasi Eq. (4), (8), (9), (10) & Algorithm 1:<br>• Inisialisasi: $\theta_s = \theta_d = \theta_m = 1/3$<br>• Dihitung di akhir tiap epoch validasi berdasarkan *Mean* ($L_{\text{mean}}$) & *Std* ($L_{\text{std}}$) MAE dari $M$ batch validasi:<br>  $$T_{\text{mean}}^i = \frac{\|L_{\text{mean}}^i(k) - L_{\text{mean}}^i(k-1)\|_1}{L_{\text{mean}}^i(k)}$$<br>  $$T_{\text{std}}^i = \frac{\|L_{\text{std}}^i(k) - L_{\text{std}}^i(k-1)\|_1}{L_{\text{std}}^i(k)}$$<br>  $$\tilde{\theta}^i = T_{\text{mean}}^i \cdot T_{\text{std}}^i \cdot (L_{\text{mean}}^i + L_{\text{std}}^i)$$<br>  $$\theta^i = \frac{\tilde{\theta}^i}{\sum_j \tilde{\theta}^j}$$ |
-| **Standar Evaluasi** | • **AAMI SP10**: Mean Error $\le 5\text{ mmHg}$, STD $\le 8\text{ mmHg}$<br>• **BHS Protocol**: Persentase kumulatif eror absolut $\le 5, \le 10, \le 15\text{ mmHg}$ (Grade A/B/C/D)<br>• **Bland-Altman Analysis** |
+| Aspek                                | Spesifikasi Resmi Paper Fan et al. (Sensors 2021)                                                                                                                                                                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dataset**                    | PhysioNet MIMIC-II Version 3.0 Waveform Database (21.422 sinyal sinkron ECG Lead II & ABP).                                                                                                                                                                             |
+| **Data Split**                 | Random split independen:**80% Training**, **10% Validation**, **10% Testing**.                                                                                                                                                                        |
+| **Filtering ECG**              | **Discrete Wavelet Transform (DWT)** wavelet Daubechies 8 (`db8`) 8 tingkat dekomposisi. Koefisien aproksimasi tingkat ke-8 (0–0,24 Hz) dan detail tingkat ke-1 (31,25–62,5 Hz) dinolkan, lalu direkonstruksi via inverse DWT (pita efektif: 0,24–31,25 Hz). |
+| **Resampling**                 | Sinyal ECG direkonstruksi di-downsample dari**125 Hz ke 100 Hz**.                                                                                                                                                                                                 |
+| **Panjang Jendela**            | 10 detik (@ 100 Hz = 1.000 titik sampel).                                                                                                                                                                                                                               |
+| **Normalisasi ECG**            | Min-Max Normalization:$x_{\text{norm}} = \frac{x - x_{\min}}{x_{\max} - x_{\min}} \in [0, 1]$.                                                                                                                                                                        |
+| **Ekstraksi ABP Ground Truth** | •$\text{SBP} = \max(\text{segmen 10s})$• $\text{DBP} = \min(\text{segmen 10s})$• $\text{MAP} = \frac{\text{SBP} + 2\cdot\text{DBP}}{3}$.                                                                                                                       |
+| **Quality Assessment ABP**     | Skewness index dihitung pada sub-segmen ABP 1 detik*non-overlapping*. Jika ada nilai skewness $< 0$, seluruh segmen 10 detik (ECG & ABP) **dibuang**.                                                                                                         |
+| **Struktur Input BiLSTM**      | **`Time steps: 50`**, **`Sequence length: 20`** ($50 \times 20 = 1.000$ titik). Sinyal 1.000 sampel di-reshape menjadi matriks $50 \times 20$.                                                                                                      |
+| **Sha red Backbone**          | 2-Layer Bidirectional LSTM (BiLSTM),`hidden_size = 256` per arah (output terminal forward akhir + backward awal di-concat = **512 unit**).                                                                                                                      |
+| **Task-Specific Heads**        | 3 head terpisah (SBP, DBP, MAP) dengan arsitektur identik:`Linear(512 → 512)` → `ReLU` → `Linear(512 → 256)` → `ReLU` → `Linear(256 → 1)`.                                                                                                             |
+| **Dropout**                    | **Tidak ada dropout** (baik pada BiLSTM maupun FC heads).                                                                                                                                                                                                         |
+| **Inisialisasi Bobot**         | Seluruh bobot dan bias diinisialisasi dari distribusi seragam$U(-\sqrt{d}, \sqrt{d})$ dengan $d = 256$.                                                                                                                                                             |
+| **Optimizer**                  | **Mini-batch SGD with Momentum**: `lr = 0.0008`, `momentum = 0.9`, `batch_size = 128`.                                                                                                                                                                      |
+| **Regularisasi L2**            | **Weight decay = 0.1** pada seluruh bobot dan bias.                                                                                                                                                                                                               |
+| **Jumlah Epoch**               | **500 Epoch**.                                                                                                                                                                                                                                                    |
+| **LR Scheduler**               | `ReduceLROnPlateau(mode='min', factor=0.9, patience=4)`. **Dipicu saat Training Loss tidak lagi menurun**.                                                                                                                                                      |
+| **Loss Function Training**     | **RMSE / Root Mean Square Error** (Caption Gambar 1: *"computing the root mean square loss values"*).                                                                                                                                                           |
+| **Adaptive Weight Learning**   | Formulasi Eq. (4), (8), (9), (10) & Algorithm 1:• Inisialisasi:$\theta_s = \theta_d = \theta_m = 1/3$• Dihitung di akhir tiap epoch validasi berdasarkan *Mean* ($L_{\text{mean}}$) & *Std* ($L_{\text{std}}$) MAE dari $M$ batch validasi:               |
+
+$$
+T_{\text{mean}}^i = \frac{\|L_{\text{mean}}^i(k) - L_{\text{mean}}^i(k-1)\|_1}{L_{\text{mean}}^i(k)}
+$$
+
+$$
+T_{\text{std}}^i = \frac{\|L_{\text{std}}^i(k) - L_{\text{std}}^i(k-1)\|_1}{L_{\text{std}}^i(k)}
+$$
+
+$$
+\tilde{\theta}^i = T_{\text{mean}}^i \cdot T_{\text{std}}^i \cdot (L_{\text{mean}}^i + L_{\text{std}}^i)
+$$
+
+$$
+\theta^i = \frac{\tilde{\theta}^i}{\sum_j \tilde{\theta}^j}
+$$
+
+ |
+| **Standar Evaluasi**           | •**AAMI SP10**: Mean Error $\le 5\text{ mmHg}$, STD $\le 8\text{ mmHg}$• **BHS Protocol**: Persentase kumulatif eror absolut $\le 5, \le 10, \le 15\text{ mmHg}$ (Grade A/B/C/D)• **Bland-Altman Analysis**                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
@@ -61,8 +80,8 @@ Repositori ini mengadopsi paper Fan et al. (2021) dengan sejumlah **penyesuaian 
    - Loss regresi training menggunakan **MAE (L1Loss)**, konsisten dengan metrik validasi.
    - `scheduler.step(val_loss)` memantau **Validation Loss** (standar *deep learning* modern untuk menghindari *overfitting*).
 6. **Path Dataset di Lingkungan Kaggle**:
-   - Dataset input terpasang di:  
-     `/kaggle/input/datasets/mkachuee/BloodPressureDataset`  
+   - Dataset input terpasang di:
+     `/kaggle/input/datasets/mkachuee/BloodPressureDataset`
      *(tanpa download otomatis via `kagglehub`)*.
 
 ---
