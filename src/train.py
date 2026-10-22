@@ -265,6 +265,7 @@ def save_checkpoint(
     checkpoint_dict = {
         "epoch": epoch,
         "model_state_dict": model.state_dict(),
+        "model_kwargs": model.get_config() if hasattr(model, "get_config") else {},
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
         "scaler_state_dict": scaler.state_dict() if scaler else None,
@@ -656,11 +657,16 @@ def main():
     parser.add_argument("--momentum", type=float, default=0.9, help="Momentum untuk SGD (Fan et al. 2021: 0.9)")
     parser.add_argument("--weight-decay", type=float, default=0.1, help="L2 Regularization (Fan et al. 2021: 0.1, atau 1e-5 untuk AdamW)")
     parser.add_argument("--grad-clip", type=float, default=5.0, help="Gradient clipping norm")
-    parser.add_argument("--scheduler-factor", type=float, default=0.9, help="ReduceLROnPlateau decay factor")
-    parser.add_argument("--scheduler-patience", type=int, default=4, help="ReduceLROnPlateau patience")
+    parser.add_argument("--scheduler-type", type=str, default="plateau", choices=["plateau", "cosine"], help="Tipe LR scheduler: 'plateau' (ReduceLROnPlateau) atau 'cosine' (CosineAnnealingLR)")
+    parser.add_argument("--scheduler-factor", type=float, default=0.8, help="ReduceLROnPlateau decay factor (default: 0.8)")
+    parser.add_argument("--scheduler-patience", type=int, default=10, help="ReduceLROnPlateau patience (default: 10 epoch, mencegah pembekuan dini)")
+    parser.add_argument("--min-lr", type=float, default=1e-5, help="Batas bawah minimum learning rate (default: 1e-5)")
     parser.add_argument("--loss-fn", type=str, default="rmse", choices=["rmse", "mae", "mse", "smooth_l1"], help="Fungsi loss pelatihan (Fan et al. 2021: rmse, default: rmse)")
     parser.add_argument("--loss-min-weight", type=float, default=0.15, help="Batas bawah bobot minimum tugas adaptif (default: 0.15)")
     parser.add_argument("--loss-momentum", type=float, default=0.70, help="Faktor smoothing momentum antarepoch bobot adaptif (default: 0.70)")
+    parser.add_argument("--loss-normalize", action="store_true", default=True, help="Normalisasi loss terhadap skala fisiologis (default: True, menyeimbangkan DBP & SBP)")
+    parser.add_argument("--no-loss-normalize", dest="loss_normalize", action="store_false", help="Nonaktifkan normalisasi skala loss (pure Fan et al.)")
+    parser.add_argument("--target-scales", nargs=3, type=float, default=[120.0, 80.0, 93.3], help="Skala fisiologis [SBP, DBP, MAP] untuk normalisasi loss (default: 120 80 93.3)")
 
     # Arsitektur BiLSTM (Tabel 1 Fan et al., 2021)
     parser.add_argument("--hidden-size", type=int, default=256, help="Hidden units per arah BiLSTM (output concat: 512)")
@@ -677,16 +683,51 @@ def main():
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
     # Fitur Statistik Terpandu (Nour et al. 2022 / Ilham Hakim 2025)
-    parser.add_argument("--use-features", action="store_true", default=True, help="Gunakan 12 fitur statistik terpandu (default: True)")
+    parser.add_argument("--use-features", action="store_true", default=True, help="Gunakan fitur statistik terpandu (default: True)")
     parser.add_argument("--no-features", dest="use_features", action="store_false", help="Nonaktifkan fitur statistik (mode Pure BiLSTM)")
     parser.add_argument(
         "--feature-set", type=str, default="top12", choices=list(FEATURE_SETS),
         help="Set fitur: top12 = 12 fitur Ranking 1-5 (default), all25 = seluruh 25 fitur Tabel 3.1 (ablasi)",
     )
 
+    # Optimasi Arsitektur Fan et al. (Pilar 1: Patching & Pilar 2: Proyeksi Fitur & Pilar 3: Temporal Attention)
+    parser.add_argument(
+        "--patch-size", type=int, default=25,
+        help="Ukuran patch spasial-temporal untuk unrolling BiLSTM (default: 25 -> 50 timesteps, sesuai Fan et al. 2021; gunakan 1 untuk unrolling 1250 langkah)",
+    )
+    parser.add_argument(
+        "--use-projection", action="store_true", default=True,
+        help="Aktifkan Feature Projection MLP untuk mencegah feature drowning (default: True)",
+    )
+    parser.add_argument(
+        "--no-projection", dest="use_projection", action="store_false",
+        help="Nonaktifkan Feature Projection MLP (fitur langsung dikonkatenasikan)",
+    )
+    parser.add_argument(
+        "--proj-dim", type=int, default=64,
+        help="Dimensi output Feature Projector MLP (default: 64)",
+    )
+    parser.add_argument(
+        "--proj-dropout", type=float, default=0.1,
+        help="Dropout rate pada Feature Projector MLP (default: 0.1)",
+    )
+    parser.add_argument(
+        "--use-attention", action="store_true", default=False,
+        help="Aktifkan Temporal Attention Pooling atas 50 timestep (default: False, menggunakan terminal states)",
+    )
+    parser.add_argument(
+        "--no-attention", dest="use_attention", action="store_false",
+        help="Gunakan terminal states (default Fan et al.)",
+    )
+    parser.add_argument(
+        "--lstm-weight-decay", type=float, default=None,
+        help="L2 Regularization khusus untuk recurrent weights BiLSTM (default: None -> mengikuti --weight-decay). Rekomendasi: 1e-4 atau 0.0 jika unrolling panjang",
+    )
+
     # Mitigasi SSH: Resume Capabilities
     parser.add_argument("--resume", type=str, default=None, help="Jalur checkpoint .pt untuk melanjutkan training")
     parser.add_argument("--auto-resume", action="store_true", default=False, help="Otomatis melanjutkan dari 'last_checkpoint.pt' jika tersedia di folder checkpoint")
+
 
     args = parser.parse_args()
 
@@ -710,19 +751,27 @@ def main():
     if args.num_workers < 0:
         args.num_workers = min(os.cpu_count() or 4, 8) if use_cuda else 0
 
+    lstm_decay = args.lstm_weight_decay if args.lstm_weight_decay is not None else args.weight_decay
+
     logger.info("=" * 75)
     logger.info("  PELATIHAN DEEP LEARNING: MULTI-TASK BiLSTM (ECG -> SBP/DBP/MAP)")
     logger.info("  Parameter & Metodologi Sesuai Paper Acuan: Fan et al. (2021, Sensors)")
     logger.info("=" * 75)
     logger.info(f"  Batch Size         : {args.batch_size}")
     logger.info(f"  Learning Rate      : {args.lr}")
-    logger.info(f"  Optimizer          : {args.optimizer.upper()} (Momentum: {args.momentum}, Weight Decay: {args.weight_decay})")
+    logger.info(f"  Optimizer          : {args.optimizer.upper()} (Momentum: {args.momentum}, Weight Decay: {args.weight_decay}, LSTM Decay: {lstm_decay})")
+    logger.info(f"  BiLSTM Patch Size  : {args.patch_size} (Unrolls {1250 // args.patch_size} timesteps x {args.patch_size} features)")
+    logger.info(f"  Feature Projection : {'AKTIF (proj_dim=' + str(args.proj_dim) + ')' if (args.use_features and args.use_projection) else 'NON-AKTIF'}")
+    logger.info(f"  Temporal Attention : {'AKTIF (Self-Attention Pooling)' if args.use_attention else 'NON-AKTIF (Terminal States)'}")
+    logger.info(f"  Loss Normalization : {'AKTIF ' + str(args.target_scales) if args.loss_normalize else 'NON-AKTIF'}")
+    logger.info(f"  LR Scheduler       : {args.scheduler_type.upper()} (Patience={args.scheduler_patience}, Factor={args.scheduler_factor}, MinLR={args.min_lr:.1e})")
     logger.info(f"  BiLSTM Dropout     : LSTM={args.lstm_dropout}, FC Heads={args.fc_dropout}")
     logger.info(f"  Mixed Precision    : {'AKTIF (FP16 GradScaler)' if (args.amp and use_cuda) else 'NON-AKTIF'}")
     logger.info(f"  DataLoader Workers : {args.num_workers} (Pin Memory: {use_cuda})")
     logger.info(f"  Folder Checkpoint  : {args.checkpoint_dir}")
     logger.info(f"  File Log Aktif     : {log_file}")
     logger.info("=" * 75)
+
 
     # 1. Muat Dataset
     dataset = load_dataset_parts(
@@ -803,7 +852,7 @@ def main():
 
     # 3. Inisialisasi Model, Loss, dan Optimizer
     model = ECGMultiTaskBiLSTM(
-        input_size=1,
+        input_size=args.patch_size if args.patch_size > 1 else 1,
         hidden_size=args.hidden_size,
         num_layers=args.num_layers,
         lstm_dropout=args.lstm_dropout,
@@ -811,6 +860,11 @@ def main():
         sbp_feat_dim=sbp_feat_dim,
         dbp_feat_dim=dbp_feat_dim,
         map_feat_dim=map_feat_dim,
+        patch_size=args.patch_size,
+        use_projection=args.use_projection if args.use_features else False,
+        proj_dim=args.proj_dim,
+        proj_dropout=args.proj_dropout,
+        use_attention=args.use_attention,
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -820,21 +874,29 @@ def main():
         loss_fn_type=args.loss_fn,
         min_weight=args.loss_min_weight,
         momentum=args.loss_momentum,
+        target_scales=args.target_scales if args.loss_normalize else None,
     ).to(device)
 
-    # Pisahkan parameter weight decay: jangan kenakan weight decay pada bias (mencegah penarikan paksa ke 0)
-    decay_params = []
+    # Pisahkan parameter weight decay:
+    # 1. BiLSTM recurrent weights -> lstm_decay (mencegah penarikan bobot LSTM ke 0 saat unrolling)
+    # 2. FC Heads & Projector weights -> args.weight_decay
+    # 3. Bias & 1D norm/scale -> 0.0
+    lstm_params = []
+    fc_params = []
     no_decay_params = []
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
         if "bias" in name or param.ndim <= 1:
             no_decay_params.append(param)
+        elif "lstm" in name:
+            lstm_params.append(param)
         else:
-            decay_params.append(param)
+            fc_params.append(param)
 
     param_groups = [
-        {"params": decay_params, "weight_decay": args.weight_decay},
+        {"params": lstm_params, "weight_decay": lstm_decay},
+        {"params": fc_params, "weight_decay": args.weight_decay},
         {"params": no_decay_params, "weight_decay": 0.0},
     ]
 
@@ -850,9 +912,19 @@ def main():
             lr=args.lr,
         )
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=args.scheduler_factor, patience=args.scheduler_patience
-    )
+    if args.scheduler_type == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=args.epochs, eta_min=args.min_lr
+        )
+    else:
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=args.scheduler_factor,
+            patience=args.scheduler_patience,
+            min_lr=args.min_lr,
+        )
+
 
     # Scaler untuk Automatic Mixed Precision
     scaler = torch.amp.GradScaler("cuda", enabled=(args.amp and use_cuda))
@@ -923,8 +995,12 @@ def main():
         )
 
         avg_val_mae = (val_res["mae_sbp"] + val_res["mae_dbp"] + val_res["mae_map"]) / 3.0
-        scheduler.step(avg_val_mae)
+        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            scheduler.step(avg_val_mae)
+        elif scheduler is not None:
+            scheduler.step()
         lr_now = optimizer.param_groups[0]["lr"]
+
         elapsed = time.time() - t0
 
         history["train_loss"].append(train_res["loss"])
@@ -1021,15 +1097,20 @@ def main():
 
     # C. final_model_full.pt (Artefak Terintegrasi untuk Deployment/Inference)
     final_bundle_path = os.path.join(output_dir, "final_model_full.pt")
+    model_cfg = model.get_config() if hasattr(model, "get_config") else {
+        "input_size": args.patch_size if args.patch_size > 1 else 1,
+        "hidden_size": args.hidden_size,
+        "num_layers": args.num_layers,
+        "lstm_dropout": args.lstm_dropout,
+        "fc_dropout": args.fc_dropout,
+        "patch_size": args.patch_size,
+        "use_projection": args.use_projection if args.use_features else False,
+        "proj_dim": args.proj_dim,
+    }
     torch.save({
         "model_state_dict": model.state_dict(),
-        "model_config": {
-            "input_size": 1,
-            "hidden_size": args.hidden_size,
-            "num_layers": args.num_layers,
-            "lstm_dropout": args.lstm_dropout,
-            "fc_dropout": args.fc_dropout,
-        },
+        "model_config": model_cfg,
+        "model_kwargs": model_cfg,
         "training_args": vars(args),
         "evaluation": eval_full,
     }, final_bundle_path)

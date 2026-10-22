@@ -34,6 +34,7 @@ class AdaptiveMultiTaskLoss(nn.Module):
         loss_fn_type: str = "mae",
         min_weight: float = 0.15,
         momentum: float = 0.70,
+        target_scales: Optional[List[float]] = None,
     ):
         """
         Parameters
@@ -44,11 +45,15 @@ class AdaptiveMultiTaskLoss(nn.Module):
             Batas bawah bobot minimum tugas (default: 0.15) untuk mencegah weight collapse ke 0.
         momentum : float, optional
             Faktor smoothing eksponensial antarepoch (default: 0.70) untuk meredam osilasi liar.
+        target_scales : list of float, optional
+            Skala normalisasi fisiologis [scale_sbp, scale_dbp, scale_map] (misal: [120.0, 80.0, 93.3]).
+            Mencegah bias gradien dominan pada target berangka absolut besar (SBP) dan menyeimbangkan DBP.
         """
         super().__init__()
         self.loss_fn_type = loss_fn_type
         self.min_weight = min_weight
         self.momentum = momentum
+        self.target_scales = list(target_scales) if target_scales is not None else None
 
         # Inisialisasi bobot tugas: theta_i = 1/3 (Fan et al., 2021 Algorithm 1 Step 1)
         self.register_buffer("weights", torch.tensor([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], dtype=torch.float32))
@@ -107,16 +112,26 @@ class AdaptiveMultiTaskLoss(nn.Module):
         dbp_pred = dbp_pred.view_as(dbp_true)
         map_pred = map_pred.view_as(map_true)
 
-        # Hitung loss per tugas (MAE sesuai paper Fan et al.)
+        # Hitung loss per tugas (MAE/RMSE/MSE/Smooth L1 sesuai loss_fn_type)
         loss_sbp = self._compute_single_loss(sbp_pred, sbp_true)
         loss_dbp = self._compute_single_loss(dbp_pred, dbp_true)
         loss_map = self._compute_single_loss(map_pred, map_true)
+
+        if self.target_scales is not None:
+            scale_s, scale_d, scale_m = self.target_scales
+            eff_loss_sbp = loss_sbp / scale_s
+            eff_loss_dbp = loss_dbp / scale_d
+            eff_loss_map = loss_map / scale_m
+        else:
+            eff_loss_sbp = loss_sbp
+            eff_loss_dbp = loss_dbp
+            eff_loss_map = loss_map
 
         # Bobot aktif: theta_s, theta_d, theta_m
         theta_s, theta_d, theta_m = self.weights[0], self.weights[1], self.weights[2]
 
         # Total Loss (Eq. 4 Fan et al., 2021)
-        total_loss = theta_s * loss_sbp + theta_d * loss_dbp + theta_m * loss_map
+        total_loss = theta_s * eff_loss_sbp + theta_d * eff_loss_dbp + theta_m * eff_loss_map
 
         metrics = {
             "loss_total": float(total_loss.detach().cpu().item()),
@@ -139,6 +154,7 @@ class AdaptiveMultiTaskLoss(nn.Module):
         """
         Memperbarui bobot tugas theta_i di akhir fase validasi sesuai Algorithm 1 (Lines 11-15)
         dan Equations (8, 9, 10) Fan et al. (2021).
+        Jika target_scales aktif, tren dinormalisasi terhadap skala fisiologis target.
 
         Parameters
         ----------
@@ -155,16 +171,24 @@ class AdaptiveMultiTaskLoss(nn.Module):
             Dictionary bobot baru {'weight_sbp': ..., 'weight_dbp': ..., 'weight_map': ...}
         """
         # Step 11: Compute mean value Li_mean(k) and standard deviation Li_std(k)
-        cur_mean = np.array([
+        raw_mean = np.array([
             float(np.mean(val_sbp_losses)),
             float(np.mean(val_dbp_losses)),
             float(np.mean(val_map_losses))
         ])
-        cur_std = np.array([
+        raw_std = np.array([
             float(np.std(val_sbp_losses)),
             float(np.std(val_dbp_losses)),
             float(np.std(val_map_losses))
         ])
+
+        if self.target_scales is not None:
+            scales = np.array(self.target_scales, dtype=float)
+            cur_mean = raw_mean / scales
+            cur_std = raw_std / scales
+        else:
+            cur_mean = raw_mean
+            cur_std = raw_std
 
         # Pastikan tidak ada pembagian dengan nol
         eps = 1e-8
@@ -218,6 +242,7 @@ class AdaptiveMultiTaskLoss(nn.Module):
             "weights": self.weights.detach().cpu().clone(),
             "prev_val_mean": self.prev_val_mean.copy() if self.prev_val_mean is not None else None,
             "prev_val_std": self.prev_val_std.copy() if self.prev_val_std is not None else None,
+            "target_scales": self.target_scales,
         }
 
     def load_state(self, state: Dict[str, any]) -> None:
@@ -231,4 +256,6 @@ class AdaptiveMultiTaskLoss(nn.Module):
             self.prev_val_mean = np.array(state["prev_val_mean"], dtype=float)
         if "prev_val_std" in state and state["prev_val_std"] is not None:
             self.prev_val_std = np.array(state["prev_val_std"], dtype=float)
+        if "target_scales" in state:
+            self.target_scales = state["target_scales"]
 

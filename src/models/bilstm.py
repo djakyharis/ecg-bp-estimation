@@ -9,7 +9,7 @@ Sesuai rancangan skripsi dan ARCHITECTURE.md:
       * MAP Head: Linear(512 -> 512) -> ReLU -> Dropout(0.2) -> Linear(512 -> 256) -> ReLU -> Dropout(0.2) -> Linear(256 -> 1)
 """
 
-from typing import Dict, Tuple, Optional, Union
+from typing import Dict, Tuple, Optional, Union, Any
 import torch
 import torch.nn as nn
 
@@ -62,10 +62,59 @@ class TaskSpecificHead(nn.Module):
         return self.net(x)
 
 
+class FeatureProjector(nn.Module):
+    """
+    Subnet MLP untuk memproyeksikan fitur statistik sebelum digabungkan dengan representasi BiLSTM.
+    Mencegah fenomena Feature Drowning (Blueprint Fan et al. Pilar 2):
+      Linear(in_features -> 128) -> LayerNorm(128) -> ReLU -> Dropout(dropout) -> Linear(128 -> out_dim) -> ReLU
+    """
+
+    def __init__(self, in_features: int, out_dim: int = 64, dropout: float = 0.1):
+        super().__init__()
+        self.in_features = in_features
+        self.out_dim = out_dim
+        self.net = nn.Sequential(
+            nn.Linear(in_features, 128),
+            nn.LayerNorm(128),
+            nn.ReLU(),
+            nn.Dropout(dropout) if dropout > 0.0 else nn.Identity(),
+            nn.Linear(128, out_dim),
+            nn.ReLU(),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+class TemporalAttention(nn.Module):
+    """
+    Temporal Self-Attention Pooling over timesteps:
+    Menghitung bobot atensi untuk setiap timestep sekuens dan menghasilkan
+    vektor konteks berbobot shape [batch, hidden_dim].
+    Menggantikan terminal states agar seluruh siklus jantung terbaca optimal.
+    """
+
+    def __init__(self, hidden_dim: int):
+        super().__init__()
+        self.proj = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.Tanh(),
+            nn.Linear(hidden_dim // 2, 1, bias=False),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape: [batch, seq_len, hidden_dim]
+        scores = self.proj(x)  # [batch, seq_len, 1]
+        weights = torch.softmax(scores, dim=1)  # [batch, seq_len, 1]
+        context = torch.sum(x * weights, dim=1)  # [batch, hidden_dim]
+        return context
+
+
 class ECGMultiTaskBiLSTM(nn.Module):
     """
     Model Multi-Task BiLSTM untuk estimasi simultan SBP, DBP, dan MAP dari sinyal ECG 10 detik.
-    Sesuai Tabel 1 & Section 2.3 Fan et al. (2021, Sensors).
+    Sesuai Tabel 1 & Section 2.3 Fan et al. (2021, Sensors) dengan ekstensi optimasi
+    Spatial-Temporal Patching (Pilar 1), Feature Projection MLP (Pilar 2), dan Temporal Attention (Pilar 3).
     """
 
     def __init__(
@@ -79,20 +128,33 @@ class ECGMultiTaskBiLSTM(nn.Module):
         sbp_feat_dim: int = 0,
         dbp_feat_dim: int = 0,
         map_feat_dim: int = 0,
+        patch_size: int = 1,
+        use_projection: bool = False,
+        proj_dim: int = 64,
+        proj_dropout: float = 0.1,
+        use_attention: bool = False,
     ):
         super().__init__()
         self.input_size = input_size
+        self.patch_size = patch_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.use_projection = use_projection
+        self.proj_dim = proj_dim
+        self.proj_dropout = proj_dropout
+        self.use_attention = use_attention
 
         eff_lstm_dropout = lstm_dropout if lstm_dropout is not None else dropout
         eff_fc_dropout = fc_dropout if fc_dropout is not None else dropout
         self.lstm_dropout = eff_lstm_dropout
         self.fc_dropout = eff_fc_dropout
 
+        # Jika patch_size > 1, input per timestep adalah patch_size (misal 25 sampel = 0.2 detik)
+        lstm_in_dim = patch_size if patch_size > 1 else input_size
+
         # Shared BiLSTM Encoder (Tabel 1 Fan et al., 2021)
         self.lstm = nn.LSTM(
-            input_size=input_size,
+            input_size=lstm_in_dim,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
@@ -103,29 +165,56 @@ class ECGMultiTaskBiLSTM(nn.Module):
         # Dimensi output BiLSTM (2 * hidden_size karena bidirectional: 256 * 2 = 512)
         encoder_out_dim = hidden_size * 2
 
+        # Temporal Attention Pooling (opsional)
+        if use_attention:
+            self.attention = TemporalAttention(encoder_out_dim)
+        else:
+            self.attention = None
+
         self.sbp_feat_dim = sbp_feat_dim
         self.dbp_feat_dim = dbp_feat_dim
         self.map_feat_dim = map_feat_dim
 
+        # Inisialisasi Feature Projector jika use_projection aktif (Pilar 2)
+        if use_projection and sbp_feat_dim > 0:
+            self.sbp_proj = FeatureProjector(sbp_feat_dim, proj_dim, dropout=proj_dropout)
+            sbp_in_dim = encoder_out_dim + proj_dim
+        else:
+            self.sbp_proj = None
+            sbp_in_dim = encoder_out_dim + sbp_feat_dim
+
+        if use_projection and dbp_feat_dim > 0:
+            self.dbp_proj = FeatureProjector(dbp_feat_dim, proj_dim, dropout=proj_dropout)
+            dbp_in_dim = encoder_out_dim + proj_dim
+        else:
+            self.dbp_proj = None
+            dbp_in_dim = encoder_out_dim + dbp_feat_dim
+
+        if use_projection and map_feat_dim > 0:
+            self.map_proj = FeatureProjector(map_feat_dim, proj_dim, dropout=proj_dropout)
+            map_in_dim = encoder_out_dim + proj_dim
+        else:
+            self.map_proj = None
+            map_in_dim = encoder_out_dim + map_feat_dim
+
         # 3 Dedicated Task Heads (2 hidden layers: 512 -> 256 -> 1 sesuai Fan et al. 2021)
-        # Mendukung Hybrid Architecture: in_features = 512 (BiLSTM) + fitur statistik spesifik
         fc1_dim = encoder_out_dim if encoder_out_dim != 512 else 512
         fc2_dim = encoder_out_dim // 2 if encoder_out_dim != 512 else 256
 
         self.sbp_head = TaskSpecificHead(
-            in_features=encoder_out_dim + sbp_feat_dim,
+            in_features=sbp_in_dim,
             hidden_dim1=fc1_dim,
             hidden_dim2=fc2_dim,
             dropout=eff_fc_dropout,
         )
         self.dbp_head = TaskSpecificHead(
-            in_features=encoder_out_dim + dbp_feat_dim,
+            in_features=dbp_in_dim,
             hidden_dim1=fc1_dim,
             hidden_dim2=fc2_dim,
             dropout=eff_fc_dropout,
         )
         self.map_head = TaskSpecificHead(
-            in_features=encoder_out_dim + map_feat_dim,
+            in_features=map_in_dim,
             hidden_dim1=fc1_dim,
             hidden_dim2=fc2_dim,
             dropout=eff_fc_dropout,
@@ -150,18 +239,39 @@ class ECGMultiTaskBiLSTM(nn.Module):
         Parameters
         ----------
         x : torch.Tensor
-            Input tensor [batch, seq_len] atau [batch, seq_len, 1].
+            Input tensor:
+            - Jika patch_size == 1: [batch, seq_len] atau [batch, seq_len, 1]
+            - Jika patch_size > 1: [batch, 1250], [batch, 1250, 1], atau [batch, 50, patch_size]
         """
-        if x.dim() == 2:
-            x = x.unsqueeze(-1)  # [batch, seq_len, 1]
+        if self.patch_size > 1:
+            if x.dim() == 3 and x.shape[-1] == 1:
+                x = x.squeeze(-1)  # [batch, total_len]
+            if x.dim() == 2:
+                batch_size, total_len = x.shape
+                if total_len % self.patch_size != 0:
+                    raise ValueError(
+                        f"Panjang sinyal {total_len} tidak habis dibagi patch_size {self.patch_size}"
+                    )
+                seq_len = total_len // self.patch_size
+                x = x.view(batch_size, seq_len, self.patch_size)  # [batch, seq_len, patch_size]
+            elif x.dim() == 3 and x.shape[-1] != self.patch_size:
+                raise ValueError(
+                    f"Dimensi fitur input {x.shape[-1]} tidak cocok dengan patch_size {self.patch_size}"
+                )
+        else:
+            if x.dim() == 2:
+                x = x.unsqueeze(-1)  # [batch, seq_len, 1]
 
         # lstm_out shape: [batch, seq_len, 2 * hidden_size]
         lstm_out, _ = self.lstm(x)
 
-        # Ekstraksi terminal state: forward akhir dan backward awal (Fan et al., 2021)
-        fwd_last = lstm_out[:, -1, : self.hidden_size]
-        bwd_first = lstm_out[:, 0, self.hidden_size :]
-        features = torch.cat([fwd_last, bwd_first], dim=-1)  # [batch, 512]
+        if self.use_attention and self.attention is not None:
+            features = self.attention(lstm_out)  # [batch, 512]
+        else:
+            # Ekstraksi terminal state: forward akhir dan backward awal (Fan et al., 2021)
+            fwd_last = lstm_out[:, -1, : self.hidden_size]
+            bwd_first = lstm_out[:, 0, self.hidden_size :]
+            features = torch.cat([fwd_last, bwd_first], dim=-1)  # [batch, 512]
 
         return features
 
@@ -176,10 +286,10 @@ class ECGMultiTaskBiLSTM(nn.Module):
         Parameters
         ----------
         x : torch.Tensor
-            Input batch sinyal ECG, shape [batch, 1250, 1] atau [batch, 1250].
+            Input batch sinyal ECG, shape [batch, 1250, 1], [batch, 1250], atau [batch, 50, patch_size].
         features : dict atau torch.Tensor, optional
-            Fitur statistik tambahan per tugas {'sbp': [B, 6], 'dbp': [B, 6], 'map': [B, 12]}
-            atau gabungan [B, 12].
+            Fitur statistik tambahan per tugas {'sbp': [B, d_sbp], 'dbp': [B, d_dbp], 'map': [B, d_map]}
+            atau gabungan [B, total_feat_dim].
 
         Returns
         -------
@@ -189,18 +299,50 @@ class ECGMultiTaskBiLSTM(nn.Module):
         enc_feat = self.extract_features(x)  # [batch, 512]
 
         if features is not None and isinstance(features, dict):
-            sbp_in = torch.cat([enc_feat, features["sbp"]], dim=-1) if self.sbp_feat_dim > 0 and "sbp" in features else enc_feat
-            dbp_in = torch.cat([enc_feat, features["dbp"]], dim=-1) if self.dbp_feat_dim > 0 and "dbp" in features else enc_feat
-            map_in = torch.cat([enc_feat, features["map"]], dim=-1) if self.map_feat_dim > 0 and "map" in features else enc_feat
-        elif features is not None and isinstance(features, torch.Tensor):
-            # Jika berupa tensor utuh [B, 12]
-            f_sbp = features[:, : self.sbp_feat_dim] if self.sbp_feat_dim > 0 else None
-            f_dbp = features[:, self.sbp_feat_dim : self.sbp_feat_dim + self.dbp_feat_dim] if self.dbp_feat_dim > 0 else None
-            f_map = features[:, : self.map_feat_dim] if self.map_feat_dim > 0 else None
+            # SBP
+            if self.sbp_feat_dim > 0 and "sbp" in features:
+                f_sbp = self.sbp_proj(features["sbp"]) if self.sbp_proj is not None else features["sbp"]
+                sbp_in = torch.cat([enc_feat, f_sbp], dim=-1)
+            else:
+                sbp_in = enc_feat
 
-            sbp_in = torch.cat([enc_feat, f_sbp], dim=-1) if f_sbp is not None else enc_feat
-            dbp_in = torch.cat([enc_feat, f_dbp], dim=-1) if f_dbp is not None else enc_feat
-            map_in = torch.cat([enc_feat, f_map], dim=-1) if f_map is not None else enc_feat
+            # DBP
+            if self.dbp_feat_dim > 0 and "dbp" in features:
+                f_dbp = self.dbp_proj(features["dbp"]) if self.dbp_proj is not None else features["dbp"]
+                dbp_in = torch.cat([enc_feat, f_dbp], dim=-1)
+            else:
+                dbp_in = enc_feat
+
+            # MAP
+            if self.map_feat_dim > 0 and "map" in features:
+                f_map = self.map_proj(features["map"]) if self.map_proj is not None else features["map"]
+                map_in = torch.cat([enc_feat, f_map], dim=-1)
+            else:
+                map_in = enc_feat
+
+        elif features is not None and isinstance(features, torch.Tensor):
+            # Jika berupa tensor utuh [B, total_feat_dim]
+            raw_sbp = features[:, : self.sbp_feat_dim] if self.sbp_feat_dim > 0 else None
+            raw_dbp = features[:, self.sbp_feat_dim : self.sbp_feat_dim + self.dbp_feat_dim] if self.dbp_feat_dim > 0 else None
+            raw_map = features[:, : self.map_feat_dim] if self.map_feat_dim > 0 else None
+
+            if raw_sbp is not None:
+                f_sbp = self.sbp_proj(raw_sbp) if self.sbp_proj is not None else raw_sbp
+                sbp_in = torch.cat([enc_feat, f_sbp], dim=-1)
+            else:
+                sbp_in = enc_feat
+
+            if raw_dbp is not None:
+                f_dbp = self.dbp_proj(raw_dbp) if self.dbp_proj is not None else raw_dbp
+                dbp_in = torch.cat([enc_feat, f_dbp], dim=-1)
+            else:
+                dbp_in = enc_feat
+
+            if raw_map is not None:
+                f_map = self.map_proj(raw_map) if self.map_proj is not None else raw_map
+                map_in = torch.cat([enc_feat, f_map], dim=-1)
+            else:
+                map_in = enc_feat
         else:
             sbp_in = enc_feat
             dbp_in = enc_feat
@@ -222,3 +364,23 @@ class ECGMultiTaskBiLSTM(nn.Module):
         """
         sbp, dbp, map_val = self.forward(x, features=features)
         return torch.cat([sbp, dbp, map_val], dim=-1)
+
+    def get_config(self) -> Dict[str, Any]:
+        """Mengembalikan kamus konfigurasi arsitektur model untuk serialisasi & deployment."""
+        return {
+            "input_size": self.input_size,
+            "hidden_size": self.hidden_size,
+            "num_layers": self.num_layers,
+            "lstm_dropout": self.lstm_dropout,
+            "fc_dropout": self.fc_dropout,
+            "sbp_feat_dim": self.sbp_feat_dim,
+            "dbp_feat_dim": self.dbp_feat_dim,
+            "map_feat_dim": self.map_feat_dim,
+            "patch_size": self.patch_size,
+            "use_projection": self.use_projection,
+            "proj_dim": self.proj_dim,
+            "proj_dropout": self.proj_dropout,
+            "use_attention": self.use_attention,
+        }
+
+

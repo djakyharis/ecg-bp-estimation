@@ -89,7 +89,7 @@ class ECGBPPredictor:
             checkpoint = torch.load(weights_path, map_location=self.device)
             if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
                 # Checkpoint format lengkap dari train.py
-                model_kwargs = checkpoint.get("model_kwargs", {})
+                model_kwargs = checkpoint.get("model_kwargs") or checkpoint.get("model_config") or {}
                 if model is None:
                     self.model = ECGMultiTaskBiLSTM(**model_kwargs).to(self.device)
                 else:
