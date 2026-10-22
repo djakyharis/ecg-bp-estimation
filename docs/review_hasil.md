@@ -1,5 +1,4 @@
 # Notes Eksperimen Saya: Evaluasi & Review Model Estimasi Tekanan Darah ECG
-*Logbook Pengujian Model, Analisis Hasil Latih, dan Catatan Teknis (Acuan: Fan et al., 2021)*
 
 ---
 
@@ -8,6 +7,7 @@
 Eksperimen ini bertujuan mengembangkan dan menguji model estimasi tekanan darah kontinu (SBP, DBP, MAP) dari sinyal 1-lead ECG berdurasi 10 detik (1.250 titik @ 125 Hz). Acuan utama yang saya gunakan adalah arsitektur **Fan et al. (Sensors, 2021)**, yang saya kombinasikan dengan ekstraksi fitur statistik morfologi ECG dari paper **Nour et al. (2022)**.
 
 Evolusi arsitektur yang telah saya bangun dan latih:
+
 1. **Baseline Skripsi Awal:** Pure BiLSTM 2-layer dengan sekuens penuh 1.250 titik tanpa fitur statistik.
 2. **Hybrid Fitur Langsung:** Menggabungkan 12 fitur (Top-12) dan 25 fitur (All-25) langsung ke dense output layer bersama representasi BiLSTM.
 3. **Spatial-Temporal Patching ($50 \times 25$):** Membagi sinyal 1.250 titik menjadi 50 langkah waktu (masing-masing 25 titik / 0,2 detik) untuk memangkas panjang BPTT.
@@ -20,16 +20,16 @@ Evolusi arsitektur yang telah saya bangun dan latih:
 
 Evaluasi dilakukan pada *unseen test set* Part 1 (2.518 segmen) setelah masing-masing model dilatih 500 epoch:
 
-| Varian Model | Partisi Data | Konfigurasi Utama | SBP MAE (mmHg) | DBP MAE (mmHg) | MAP MAE (mmHg) | Rata-rata MAE (mmHg) | Akurasi SBP (Error ≤ 5 mmHg) | Status / Catatan |
-|---|:---:|---|:---:|:---:|:---:|:---:|:---:|---|
-| **run_patch_proj_gpu2** | Part 1 | **Patch 50x25 + MLP Proyeksi (64-dim)** | **15,70** | **9,06** | 10,72 | **11,83** | **21,13%** | 🏆 **Model Terbaik Saya Saat Ini** |
-| **run_patch50x25_gpu0** | Part 1 | Patch 50x25 + 25 Fitur Langsung | 16,77 | 9,10 | 10,60 | 12,16 | 18,35% | Waktu latih efisien (1,04 jam) |
-| **run_all25** | Part 1 | Sekuens 1250 + 25 Fitur Langsung | 16,81 | 9,09 | 10,59 | 12,16 | 18,11% | Baseline hybrid 25 fitur |
-| **run_top12** | Part 1 | Sekuens 1250 + 12 Fitur Langsung | 17,43 | 9,06 | 10,73 | 12,40 | 16,96% | Baseline hybrid 12 fitur |
-| **pure_bilstm_root** | 12 Part | Sekuens 1250 (Tanpa Fitur) | 18,25 | 9,17 | 10,87 | 12,76 | 15,20% | Model baseline awal skripsi |
-| **run_full12_patch_proj** | Part 1 | Patch 50x25 + Target Scaled 120/80/93 | 21,01 | 11,40 | 10,77 | 14,39 | 13,22% | Terkendala gradien underflow |
-| **run_full12_attn_gpu0** | Part 1 | Patch 50x25 + Temporal Attention | 21,01 | 11,40 | 10,77 | 14,40 | 13,22% | Terkendala gradien underflow |
-| *Target Fan et al. (2021)* | Cleaned | Patch 50x20 + ABP Skewness Filter | *7,63* | *4,36* | *5,60* | *5,86* | *~60%* | Target acuan literatur |
+| Varian Model                    | Partisi Data | Konfigurasi Utama                             | SBP MAE (mmHg) | DBP MAE (mmHg) | MAP MAE (mmHg) | Rata-rata MAE (mmHg) | Akurasi SBP (Error ≤ 5 mmHg) | Status / Catatan                    |
+| ------------------------------- | :----------: | --------------------------------------------- | :-------------: | :------------: | :------------: | :------------------: | :---------------------------: | ----------------------------------- |
+| **run_patch_proj_gpu2**   |    Part 1    | **Patch 50x25 + MLP Proyeksi (64-dim)** | **15,70** | **9,06** |     10,72     |   **11,83**   |       **21,13%**       | 🏆 **Model Terbaik Saat Ini** |
+| **run_patch50x25_gpu0**   |    Part 1    | Patch 50x25 + 25 Fitur Langsung               |      16,77      |      9,10      |     10,60     |        12,16        |            18,35%            | Waktu latih efisien (1,04 jam)      |
+| **run_all25**             |    Part 1    | Sekuens 1250 + 25 Fitur Langsung              |      16,81      |      9,09      |     10,59     |        12,16        |            18,11%            | Baseline hybrid 25 fitur            |
+| **run_top12**             |    Part 1    | Sekuens 1250 + 12 Fitur Langsung              |      17,43      |      9,06      |     10,73     |        12,40        |            16,96%            | Baseline hybrid 12 fitur            |
+| **pure_bilstm_root**      |   12 Part   | Sekuens 1250 (Tanpa Fitur)                    |      18,25      |      9,17      |     10,87     |        12,76        |            15,20%            | Model baseline awal skripsi         |
+| **run_full12_patch_proj** |    Part 1    | Patch 50x25 + Target Scaled 120/80/93         |      21,01      |     11,40     |     10,77     |        14,39        |            13,22%            | Terkendala gradien underflow        |
+| **run_full12_attn_gpu0**  |    Part 1    | Patch 50x25 + Temporal Attention              |      21,01      |     11,40     |     10,77     |        14,40        |            13,22%            | Terkendala gradien underflow        |
+| *Target Fan et al. (2021)*    |   Cleaned   | Patch 50x20 + ABP Skewness Filter             |    *7,63*    |    *4,36*    |    *5,60*    |       *5,86*       |           *~60%*           | Target acuan literatur              |
 
 ---
 
@@ -38,6 +38,7 @@ Evaluasi dilakukan pada *unseen test set* Part 1 (2.518 segmen) setelah masing-m
 Model yang tersimpan di `checkpoints/run_patch_proj_gpu2` menunjukkan performa terbaik secara konsisten pada seluruh metrik utama.
 
 ### Poin Keberhasilan yang Tercatat:
+
 * **Penurunan Error SBP Paling Signifikan:** SBP MAE turun ke **15,70 mmHg**. Nilai ini lebih rendah **2,55 mmHg** dibanding model baseline skripsi awal (18,25 mmHg) dan unggul **1,11 mmHg** dibanding model hybrid tanpa proyeksi (16,81 mmHg).
 * **Variansi Error Paling Rendah:** Standar deviasi SBP menyentuh **19,81 mmHg**, menjadi satu-satunya model yang berhasil menembus angka di bawah 20 mmHg.
 * **Kenaikan Proporsi Standar Medis:** Akurasi prediksi dalam batas toleransi medis ($\le 5\text{ mmHg}$) mencapai **21,13%**, meningkat dari baseline 15,20%.
@@ -51,6 +52,7 @@ Model yang tersimpan di `checkpoints/run_patch_proj_gpu2` menunjukkan performa t
 Pada run `run_full12_patch_proj` dan `run_full12_attn_gpu0`, target loss dibagi dengan faktor fisiologis $[120, 80, 93,3]$. Hasil evaluasi tertahan di angka 21,01 mmHg.
 
 ### Diagnosis Teknis:
+
 * Pembagian target dengan konstanta 120 dan 80 menurunkan magnitudo numerik loss dari kisaran 18,0 menjadi 0,18 (turun sekitar 100 kali lipat).
 * Penurunan nilai loss mengecilkan gradien backpropagation $\nabla L$ sebesar 100 kali lipat.
 * Dengan learning rate SGD $0,0008$, besaran update bobot ($\Delta W$) berada di orde $10^{-6}$, sehingga didominasi oleh penalti *weight decay* ($0,1$).
@@ -64,6 +66,7 @@ Pada run `run_full12_patch_proj` dan `run_full12_attn_gpu0`, target loss dibagi 
 Pada seluruh varian model yang diuji pada Part 1, DBP MAE selalu berada di rentang **9,06 – 9,17 mmHg**, meskipun SBP berhasil membaik secara bertahap dari 18,25 ke 15,70 mmHg.
 
 ### Observasi Kualitas Data & Literatur:
+
 1. **Prosedur Pembersihan Data Fan et al. (2021):** Peneliti membagi sinyal ABP ke jendela 1 detik dan membuang segmen 10 detik jika terdapat minimal satu jendela dengan nilai **Skewness < 0**.
 2. **Karakteristik Fisiologis Gelombang ABP:** Denyut arteri normal memiliki kemiringan positif (puncak sistolik tajam). Nilai skewness negatif merupakan penanda artefak redaman kateter ICU, pergerakan pasien, atau gangguan sensor.
 3. **Perbedaan Kondisi Dataset:** Seleksi ketat Fan et al. menghasilkan 21.422 segmen yang sangat bersih. Sedangkan dataset Part 1 yang saya gunakan masih memuat sinyal mentah populasi ICU Kachuee, di mana batas bawah noise alami DBP berada pada level ~9 mmHg.
@@ -76,4 +79,3 @@ Pada seluruh varian model yang diuji pada Part 1, DBP MAE selalu berada di renta
 2. **Training Skala Penuh 12 Part:** Melatih arsitektur terbaik ini pada seluruh 12 part (261.117 sampel) dengan loss absolut murni, learning rate $0,0008$, dan scheduler patience 10 epoch.
 3. **Penyaringan Skewness ABP:** Menerapkan script filter skewness ABP pada data latih untuk menyingkirkan segmen dengan redaman kateter ICU, mendekati kondisi dataset Fan et al.
 4. **Kalibrasi Subjek Wearable:** Menerapkan skema kalibrasi baseline 1-titik ($y_{\text{baseline}}$) saat inferensi sinyal sensor Shimmer3 untuk memenuhi batas toleransi medis AAMI SP10 ($\text{MAE} \le 5\text{ mmHg}$).
-

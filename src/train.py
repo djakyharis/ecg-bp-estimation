@@ -186,9 +186,11 @@ def load_dataset_parts(
                 for p in mat_candidates
             ]
         else:
-            npz_candidates = sorted(glob.glob(os.path.join(processed_dir, "*_preprocessed.npz")))
+            npz_candidates = sorted(glob.glob(os.path.join(processed_dir, "*_clean.npz")))
+            if not npz_candidates:
+                npz_candidates = sorted(glob.glob(os.path.join(processed_dir, "*_preprocessed.npz")))
             part_nums = [
-                os.path.splitext(os.path.basename(p))[0].replace("part_", "").replace("_preprocessed", "")
+                os.path.splitext(os.path.basename(p))[0].replace("part_", "").replace("_clean", "").replace("_preprocessed", "")
                 for p in npz_candidates
             ]
     else:
@@ -196,10 +198,13 @@ def load_dataset_parts(
 
     file_paths = []
     for p in part_nums:
+        npz_clean = os.path.join(processed_dir, f"part_{p}_clean.npz")
         npz_target = os.path.join(processed_dir, f"part_{p}_preprocessed.npz")
         mat_target = os.path.join(kachuee_mat_dir, f"part_{p}.mat")
 
-        if os.path.exists(npz_target):
+        if os.path.exists(npz_clean):
+            file_paths.append(npz_clean)
+        elif os.path.exists(npz_target):
             file_paths.append(npz_target)
         elif os.path.exists(mat_target):
             log_fn(f"🔄 Berkas preprocessed belum ada: {npz_target}")
@@ -664,9 +669,10 @@ def main():
     parser.add_argument("--loss-fn", type=str, default="rmse", choices=["rmse", "mae", "mse", "smooth_l1"], help="Fungsi loss pelatihan (Fan et al. 2021: rmse, default: rmse)")
     parser.add_argument("--loss-min-weight", type=float, default=0.15, help="Batas bawah bobot minimum tugas adaptif (default: 0.15)")
     parser.add_argument("--loss-momentum", type=float, default=0.70, help="Faktor smoothing momentum antarepoch bobot adaptif (default: 0.70)")
-    parser.add_argument("--loss-normalize", action="store_true", default=True, help="Normalisasi loss terhadap skala fisiologis (default: True, menyeimbangkan DBP & SBP)")
+    parser.add_argument("--loss-normalize", action="store_true", default=False, help="Normalisasi loss terhadap skala fisiologis (default: False, pure Fan et al. skala absolut)")
     parser.add_argument("--no-loss-normalize", dest="loss_normalize", action="store_false", help="Nonaktifkan normalisasi skala loss (pure Fan et al.)")
     parser.add_argument("--target-scales", nargs=3, type=float, default=[120.0, 80.0, 93.3], help="Skala fisiologis [SBP, DBP, MAP] untuk normalisasi loss (default: 120 80 93.3)")
+    parser.add_argument("--task-weights", nargs=3, type=float, default=None, help="Bobot tetap tugas [SBP, DBP, MAP] (misal: 0.5 0.3 0.2) untuk memprioritaskan SBP")
 
     # Arsitektur BiLSTM (Tabel 1 Fan et al., 2021)
     parser.add_argument("--hidden-size", type=int, default=256, help="Hidden units per arah BiLSTM (output concat: 512)")
@@ -754,6 +760,7 @@ def main():
     lstm_decay = args.lstm_weight_decay if args.lstm_weight_decay is not None else args.weight_decay
 
     logger.info("=" * 75)
+    logger.info("  بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ (BISMILLAHIR-RAHMANIR-RAHIM)")
     logger.info("  PELATIHAN DEEP LEARNING: MULTI-TASK BiLSTM (ECG -> SBP/DBP/MAP)")
     logger.info("  Parameter & Metodologi Sesuai Paper Acuan: Fan et al. (2021, Sensors)")
     logger.info("=" * 75)
@@ -875,6 +882,7 @@ def main():
         min_weight=args.loss_min_weight,
         momentum=args.loss_momentum,
         target_scales=args.target_scales if args.loss_normalize else None,
+        task_weights=args.task_weights,
     ).to(device)
 
     # Pisahkan parameter weight decay:
@@ -969,7 +977,7 @@ def main():
 
     best_model_path = os.path.join(args.checkpoint_dir, "best_model.pt")
 
-    logger.info(f"\n🚀 Memulai proses pelatihan dari Epoch {start_epoch + 1} hingga {args.epochs}...")
+    logger.info(f"\n🚀 Bismillahir-Rahmanir-Rahim, memulai proses pelatihan dari Epoch {start_epoch + 1} hingga {args.epochs}...")
     t_start = time.time()
 
     for epoch in range(start_epoch + 1, args.epochs + 1):

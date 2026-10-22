@@ -83,3 +83,28 @@ def test_ecg_preprocessing_pipeline(synthetic_ecg_signal):
     expected_length = int(10 * 125.0)
     assert abs(len(clean_signal) - expected_length) <= 5
     assert not np.isnan(clean_signal).any()
+
+
+def test_abp_skewness_filter():
+    """Verifikasi ABP quality filter berbasis kemiringan positif sesuai Fan et al. (2021)."""
+    from src.preprocessing.kachuee_preprocessor import check_abp_skewness, compute_bp_metrics
+
+    fs = 125.0
+    t = np.linspace(0, 10, int(fs * 10), endpoint=False)
+    # Sinyal ABP realistis (upstroke tajam, penurunan bertahap) -> skewness positif
+    abp_valid = 80.0 + 40.0 * np.exp(-((t % 0.8) / 0.15))
+    assert check_abp_skewness(abp_valid, num_windows=10) is True
+
+    # Sinyal terbalik (artefak terdistorsi) -> skewness negatif
+    abp_invalid = 120.0 - 40.0 * np.exp(-((t % 0.8) / 0.15))
+    assert check_abp_skewness(abp_invalid, num_windows=10) is False
+
+    # Uji integrasi dalam compute_bp_metrics
+    bp_valid = compute_bp_metrics(abp_valid, fs=fs, check_skewness=True)
+    assert bp_valid["valid"] is True
+    assert 100.0 <= bp_valid["sbp"] <= 130.0
+    assert 70.0 <= bp_valid["dbp"] <= 90.0
+
+    bp_invalid = compute_bp_metrics(abp_invalid, fs=fs, check_skewness=True)
+    assert bp_invalid["valid"] is False
+

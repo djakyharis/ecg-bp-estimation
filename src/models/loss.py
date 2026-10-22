@@ -35,6 +35,7 @@ class AdaptiveMultiTaskLoss(nn.Module):
         min_weight: float = 0.15,
         momentum: float = 0.70,
         target_scales: Optional[List[float]] = None,
+        task_weights: Optional[List[float]] = None,
     ):
         """
         Parameters
@@ -48,6 +49,8 @@ class AdaptiveMultiTaskLoss(nn.Module):
         target_scales : list of float, optional
             Skala normalisasi fisiologis [scale_sbp, scale_dbp, scale_map] (misal: [120.0, 80.0, 93.3]).
             Mencegah bias gradien dominan pada target berangka absolut besar (SBP) dan menyeimbangkan DBP.
+        task_weights : list of float, optional
+            Bobot tetap untuk tugas [w_sbp, w_dbp, w_map] jika ingin menonaktifkan adaptasi dinamis (misal: [0.5, 0.3, 0.2]).
         """
         super().__init__()
         self.loss_fn_type = loss_fn_type
@@ -55,8 +58,15 @@ class AdaptiveMultiTaskLoss(nn.Module):
         self.momentum = momentum
         self.target_scales = list(target_scales) if target_scales is not None else None
 
-        # Inisialisasi bobot tugas: theta_i = 1/3 (Fan et al., 2021 Algorithm 1 Step 1)
-        self.register_buffer("weights", torch.tensor([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], dtype=torch.float32))
+        if task_weights is not None:
+            norm_tw = np.array(task_weights, dtype=float)
+            norm_tw = norm_tw / np.sum(norm_tw)
+            self.is_adaptive = False
+            self.register_buffer("weights", torch.tensor(norm_tw, dtype=torch.float32))
+        else:
+            self.is_adaptive = True
+            # Inisialisasi bobot tugas: theta_i = 1/3 (Fan et al., 2021 Algorithm 1 Step 1)
+            self.register_buffer("weights", torch.tensor([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], dtype=torch.float32))
 
         # Riwayat nilai rata-rata dan standar deviasi validation loss untuk perhitungan tren (Eq. 8 & 9)
         self.prev_val_mean: Optional[np.ndarray] = None
@@ -170,6 +180,13 @@ class AdaptiveMultiTaskLoss(nn.Module):
         Dict[str, float]
             Dictionary bobot baru {'weight_sbp': ..., 'weight_dbp': ..., 'weight_map': ...}
         """
+        if not getattr(self, "is_adaptive", True):
+            return {
+                "weight_sbp": float(self.weights[0].item()),
+                "weight_dbp": float(self.weights[1].item()),
+                "weight_map": float(self.weights[2].item()),
+            }
+
         # Step 11: Compute mean value Li_mean(k) and standard deviation Li_std(k)
         raw_mean = np.array([
             float(np.mean(val_sbp_losses)),

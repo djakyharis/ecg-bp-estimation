@@ -84,6 +84,8 @@ flowchart TD
     concat --> MAP_HEAD
 ```
 
+
+
 ---
 
 ## 3. Spesifikasi Rinci Setiap Komponen
@@ -92,6 +94,7 @@ flowchart TD
 
 * **Input Asli:** Sinyal ECG 1-lead ternormalisasi $x \in \mathbb{R}^{B \times 1250 \times 1}$ (durasi 10 detik dengan frekuensi sampling 125 Hz).
 * **Mekanisme Patching:**
+
   $$
   \text{Reshape}: [B, 1250] \longrightarrow [B, 50, 25]
   $$
