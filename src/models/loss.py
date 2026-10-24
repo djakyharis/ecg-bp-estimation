@@ -36,6 +36,7 @@ class AdaptiveMultiTaskLoss(nn.Module):
         momentum: float = 0.70,
         target_scales: Optional[List[float]] = None,
         task_weights: Optional[List[float]] = None,
+        lambda_phys: float = 0.10,
     ):
         """
         Parameters
@@ -51,12 +52,16 @@ class AdaptiveMultiTaskLoss(nn.Module):
             Mencegah bias gradien dominan pada target berangka absolut besar (SBP) dan menyeimbangkan DBP.
         task_weights : list of float, optional
             Bobot tetap untuk tugas [w_sbp, w_dbp, w_map] jika ingin menonaktifkan adaptasi dinamis (misal: [0.5, 0.3, 0.2]).
+        lambda_phys : float, optional
+            Bobot penalti konsistensi kardiovaskular: MAP ≈ DBP + 1/3 (SBP - DBP).
+            Default: 0.10 (menstabilkan dan mengikat gradien SBP, DBP, dan MAP).
         """
         super().__init__()
         self.loss_fn_type = loss_fn_type
         self.min_weight = min_weight
         self.momentum = momentum
         self.target_scales = list(target_scales) if target_scales is not None else None
+        self.lambda_phys = float(lambda_phys)
 
         if task_weights is not None:
             norm_tw = np.array(task_weights, dtype=float)
@@ -90,8 +95,9 @@ class AdaptiveMultiTaskLoss(nn.Module):
         targets: torch.Tensor
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """
-        Menghitung total loss adaptif multi-task sesuai Equation (4) Fan et al. (2021):
-            L_total = theta_s * L_sbp + theta_d * L_dbp + theta_m * L_map
+        Menghitung total loss adaptif multi-task sesuai Equation (4) Fan et al. (2021)
+        ditambah penalti konsistensi fisiologis MAP (MAP ≈ DBP + 1/3 (SBP - DBP)):
+            L_total = theta_s * L_sbp + theta_d * L_dbp + theta_m * L_map + lambda_phys * L_phys
 
         Parameters
         ----------
@@ -140,14 +146,23 @@ class AdaptiveMultiTaskLoss(nn.Module):
         # Bobot aktif: theta_s, theta_d, theta_m
         theta_s, theta_d, theta_m = self.weights[0], self.weights[1], self.weights[2]
 
-        # Total Loss (Eq. 4 Fan et al., 2021)
+        # Total Loss Adaptif (Eq. 4 Fan et al., 2021)
         total_loss = theta_s * eff_loss_sbp + theta_d * eff_loss_dbp + theta_m * eff_loss_map
+
+        # Penalti Konsistensi Fisiologis: MAP ≈ DBP + 1/3 * (SBP - DBP)
+        if self.lambda_phys > 0.0:
+            map_phys_pred = dbp_pred + (sbp_pred - dbp_pred) / 3.0
+            loss_phys = self._compute_single_loss(map_pred, map_phys_pred)
+            total_loss = total_loss + self.lambda_phys * loss_phys
+        else:
+            loss_phys = torch.tensor(0.0, device=total_loss.device)
 
         metrics = {
             "loss_total": float(total_loss.detach().cpu().item()),
             "mae_sbp": float(F.l1_loss(sbp_pred, sbp_true).detach().cpu().item()),
             "mae_dbp": float(F.l1_loss(dbp_pred, dbp_true).detach().cpu().item()),
             "mae_map": float(F.l1_loss(map_pred, map_true).detach().cpu().item()),
+            "loss_phys": float(loss_phys.detach().cpu().item()),
             "weight_sbp": float(theta_s.detach().cpu().item()),
             "weight_dbp": float(theta_d.detach().cpu().item()),
             "weight_map": float(theta_m.detach().cpu().item()),

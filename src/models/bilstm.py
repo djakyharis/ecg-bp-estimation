@@ -86,6 +86,28 @@ class FeatureProjector(nn.Module):
         return self.net(x)
 
 
+class GatedFeatureFusion(nn.Module):
+    """
+    Subnet Adaptive Gated Fusion:
+    Menggabungkan representasi BiLSTM laten (misal 512-dim) dengan proyeksi fitur statistik (misal 64-dim).
+    Menghitung bobot gating adaptif alpha via Sigmoid agar model mampu menentukan seberapa
+    besar mengandalkan informasi statistik morfologi untuk setiap denyut/pasien.
+    Output: Concat [enc_feat, alpha * f_proj] berdimensi (enc_dim + proj_dim = 576).
+    """
+
+    def __init__(self, enc_dim: int, proj_dim: int):
+        super().__init__()
+        self.gate = nn.Sequential(
+            nn.Linear(enc_dim + proj_dim, proj_dim),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, enc_feat: torch.Tensor, proj_feat: torch.Tensor) -> torch.Tensor:
+        alpha = self.gate(torch.cat([enc_feat, proj_feat], dim=-1))
+        gated_proj = proj_feat * alpha
+        return torch.cat([enc_feat, gated_proj], dim=-1)
+
+
 class TemporalAttention(nn.Module):
     """
     Temporal Self-Attention Pooling over timesteps:
@@ -114,7 +136,7 @@ class ECGMultiTaskBiLSTM(nn.Module):
     """
     Model Multi-Task BiLSTM untuk estimasi simultan SBP, DBP, dan MAP dari sinyal ECG 10 detik.
     Sesuai Tabel 1 & Section 2.3 Fan et al. (2021, Sensors) dengan ekstensi optimasi
-    Spatial-Temporal Patching (Pilar 1), Feature Projection MLP (Pilar 2), dan Temporal Attention (Pilar 3).
+    Spatial-Temporal Patching (Pilar 1), Feature Projection MLP (Pilar 2), Gated Fusion, dan Temporal Attention (Pilar 3).
     """
 
     def __init__(
@@ -132,6 +154,7 @@ class ECGMultiTaskBiLSTM(nn.Module):
         use_projection: bool = False,
         proj_dim: int = 64,
         proj_dropout: float = 0.1,
+        use_gating: bool = True,
         use_attention: bool = False,
     ):
         super().__init__()
@@ -142,6 +165,7 @@ class ECGMultiTaskBiLSTM(nn.Module):
         self.use_projection = use_projection
         self.proj_dim = proj_dim
         self.proj_dropout = proj_dropout
+        self.use_gating = use_gating
         self.use_attention = use_attention
 
         eff_lstm_dropout = lstm_dropout if lstm_dropout is not None else dropout
@@ -196,6 +220,22 @@ class ECGMultiTaskBiLSTM(nn.Module):
         else:
             self.map_proj = None
             map_in_dim = encoder_out_dim + map_feat_dim
+
+        # Gated Feature Fusion (Adaptive Gating)
+        if use_projection and use_gating and sbp_feat_dim > 0:
+            self.sbp_fusion = GatedFeatureFusion(encoder_out_dim, proj_dim)
+        else:
+            self.sbp_fusion = None
+
+        if use_projection and use_gating and dbp_feat_dim > 0:
+            self.dbp_fusion = GatedFeatureFusion(encoder_out_dim, proj_dim)
+        else:
+            self.dbp_fusion = None
+
+        if use_projection and use_gating and map_feat_dim > 0:
+            self.map_fusion = GatedFeatureFusion(encoder_out_dim, proj_dim)
+        else:
+            self.map_fusion = None
 
         # 3 Dedicated Task Heads (2 hidden layers: 512 -> 256 -> 1 sesuai Fan et al. 2021)
         fc1_dim = encoder_out_dim if encoder_out_dim != 512 else 512
@@ -298,25 +338,30 @@ class ECGMultiTaskBiLSTM(nn.Module):
         """
         enc_feat = self.extract_features(x)  # [batch, 512]
 
+        def _fuse(enc: torch.Tensor, f_proj: torch.Tensor, fusion_mod: Optional[GatedFeatureFusion]) -> torch.Tensor:
+            if fusion_mod is not None:
+                return fusion_mod(enc, f_proj)
+            return torch.cat([enc, f_proj], dim=-1)
+
         if features is not None and isinstance(features, dict):
             # SBP
             if self.sbp_feat_dim > 0 and "sbp" in features:
                 f_sbp = self.sbp_proj(features["sbp"]) if self.sbp_proj is not None else features["sbp"]
-                sbp_in = torch.cat([enc_feat, f_sbp], dim=-1)
+                sbp_in = _fuse(enc_feat, f_sbp, self.sbp_fusion)
             else:
                 sbp_in = enc_feat
 
             # DBP
             if self.dbp_feat_dim > 0 and "dbp" in features:
                 f_dbp = self.dbp_proj(features["dbp"]) if self.dbp_proj is not None else features["dbp"]
-                dbp_in = torch.cat([enc_feat, f_dbp], dim=-1)
+                dbp_in = _fuse(enc_feat, f_dbp, self.dbp_fusion)
             else:
                 dbp_in = enc_feat
 
             # MAP
             if self.map_feat_dim > 0 and "map" in features:
                 f_map = self.map_proj(features["map"]) if self.map_proj is not None else features["map"]
-                map_in = torch.cat([enc_feat, f_map], dim=-1)
+                map_in = _fuse(enc_feat, f_map, self.map_fusion)
             else:
                 map_in = enc_feat
 
@@ -328,19 +373,19 @@ class ECGMultiTaskBiLSTM(nn.Module):
 
             if raw_sbp is not None:
                 f_sbp = self.sbp_proj(raw_sbp) if self.sbp_proj is not None else raw_sbp
-                sbp_in = torch.cat([enc_feat, f_sbp], dim=-1)
+                sbp_in = _fuse(enc_feat, f_sbp, self.sbp_fusion)
             else:
                 sbp_in = enc_feat
 
             if raw_dbp is not None:
                 f_dbp = self.dbp_proj(raw_dbp) if self.dbp_proj is not None else raw_dbp
-                dbp_in = torch.cat([enc_feat, f_dbp], dim=-1)
+                dbp_in = _fuse(enc_feat, f_dbp, self.dbp_fusion)
             else:
                 dbp_in = enc_feat
 
             if raw_map is not None:
                 f_map = self.map_proj(raw_map) if self.map_proj is not None else raw_map
-                map_in = torch.cat([enc_feat, f_map], dim=-1)
+                map_in = _fuse(enc_feat, f_map, self.map_fusion)
             else:
                 map_in = enc_feat
         else:
@@ -380,6 +425,7 @@ class ECGMultiTaskBiLSTM(nn.Module):
             "use_projection": self.use_projection,
             "proj_dim": self.proj_dim,
             "proj_dropout": self.proj_dropout,
+            "use_gating": self.use_gating,
             "use_attention": self.use_attention,
         }
 

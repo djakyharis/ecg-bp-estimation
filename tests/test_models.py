@@ -272,4 +272,61 @@ def test_bilstm_temporal_attention():
     assert cfg["use_attention"] is True
 
 
+def test_adaptive_multi_task_loss_with_phys_regularization():
+    """Memverifikasi perhitungan penalti konsistensi fisiologis MAP: MAP ≈ DBP + 1/3(SBP - DBP)."""
+    criterion = AdaptiveMultiTaskLoss(loss_fn_type="mae", lambda_phys=0.20)
+
+    # Kasus 1: Prediksi konsisten (SBP=120, DBP=80 -> MAP=80 + 40/3 = 93.333)
+    sbp_cons = torch.tensor([[120.0]])
+    dbp_cons = torch.tensor([[80.0]])
+    map_cons = torch.tensor([[93.3333]])
+    targets = torch.tensor([[120.0, 80.0, 93.3333]])
+
+    loss_cons, met_cons = criterion(sbp_cons, dbp_cons, map_cons, targets)
+    assert met_cons["loss_phys"] < 1e-3
+
+    # Kasus 2: Prediksi inkonsisten (SBP=140, DBP=90, tapi MAP=80 -> MAP harusnya ~106.67)
+    sbp_incons = torch.tensor([[140.0]])
+    dbp_incons = torch.tensor([[90.0]])
+    map_incons = torch.tensor([[80.0]])
+    loss_incons, met_incons = criterion(sbp_incons, dbp_incons, map_incons, targets)
+    assert met_incons["loss_phys"] > 20.0
+    assert loss_incons.item() > loss_cons.item()
+
+
+def test_bilstm_with_gated_feature_fusion():
+    """Memverifikasi fungsionalitas Adaptive Gated Feature Fusion pada BiLSTM + Projector."""
+    model = ECGMultiTaskBiLSTM(
+        input_size=25,
+        hidden_size=64,
+        num_layers=1,
+        sbp_feat_dim=6,
+        dbp_feat_dim=6,
+        map_feat_dim=12,
+        patch_size=25,
+        use_projection=True,
+        proj_dim=32,
+        use_gating=True,
+    )
+    model.eval()
+
+    x = torch.randn(4, 1250)
+    feats = {
+        "sbp": torch.randn(4, 6),
+        "dbp": torch.randn(4, 6),
+        "map": torch.randn(4, 12),
+    }
+
+    sbp, dbp, mp = model(x, features=feats)
+    assert sbp.shape == (4, 1)
+    assert dbp.shape == (4, 1)
+    assert mp.shape == (4, 1)
+
+    cfg = model.get_config()
+    assert cfg["use_gating"] is True
+    assert cfg["use_projection"] is True
+    assert model.sbp_fusion is not None
+
+
+
 

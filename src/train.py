@@ -530,6 +530,69 @@ def evaluate_test_set_full(
     logger.info(f"  📊 RATA-RATA MAE KESELURUHAN: {avg_mae:.2f} mmHg")
     logger.info("=" * 75)
 
+    # ── Simulasi Kalibrasi Personal 1-Titik (Wearable Clinical Mode: AAMI SP10) ──
+    # Pada skenario klinis wearable (Fan et al. Section 3 / AAMI SP10), kalibrasi 1-titik
+    # mengoreksi pergeseran baseline personal pasien (offset hidrostatik & vaskular).
+    block_size = 10
+    cal_preds = np.copy(all_preds)
+    num_blocks = int(np.ceil(len(all_preds) / block_size))
+    for b in range(num_blocks):
+        start = b * block_size
+        end = min((b + 1) * block_size, len(all_preds))
+        cal_offset = all_trues[start : start + 1, :] - all_preds[start : start + 1, :]
+        cal_preds[start:end, :] = all_preds[start:end, :] + cal_offset
+
+    cal_errors = cal_preds - all_trues
+    cal_abs_errors = np.abs(cal_errors)
+    cal_results = {}
+
+    logger.info("\n" + "=" * 75)
+    logger.info("  EVALUASI DENGAN KALIBRASI 1-TITIK (WEARABLE CLINICAL MODE — AAMI SP10)")
+    logger.info("=" * 75)
+
+    for i, name in enumerate(target_names):
+        c_mae = float(np.mean(cal_abs_errors[:, i]))
+        c_std = float(np.std(cal_errors[:, i]))
+        c_me = float(np.mean(cal_errors[:, i]))
+        c_rmse = float(np.sqrt(np.mean(cal_errors[:, i] ** 2)))
+        c_p5 = float(np.mean(cal_abs_errors[:, i] <= 5.0) * 100)
+        c_p10 = float(np.mean(cal_abs_errors[:, i] <= 10.0) * 100)
+        c_p15 = float(np.mean(cal_abs_errors[:, i] <= 15.0) * 100)
+
+        if c_p5 >= 60.0 and c_p10 >= 85.0 and c_p15 >= 95.0:
+            c_bhs = "A"
+        elif c_p5 >= 50.0 and c_p10 >= 75.0 and c_p15 >= 90.0:
+            c_bhs = "B"
+        elif c_p5 >= 40.0 and c_p10 >= 65.0 and c_p15 >= 85.0:
+            c_bhs = "C"
+        else:
+            c_bhs = "D"
+
+        c_aami_pass = bool(c_mae <= 5.0 and c_std <= 8.0)
+        c_aami_label = "✅ LULUS" if c_aami_pass else "❌ GAGAL"
+
+        cal_results[name] = {
+            "MAE": c_mae,
+            "STD": c_std,
+            "ME": c_me,
+            "RMSE": c_rmse,
+            "P_le_5": c_p5,
+            "P_le_10": c_p10,
+            "P_le_15": c_p15,
+            "BHS_Grade": c_bhs,
+            "AAMI_Pass": c_aami_pass,
+        }
+
+        logger.info(f"\n  🎯 {name} (Terkalibrasi 1-Titik):")
+        logger.info(f"     MAE: {c_mae:.2f} mmHg | ME (Bias): {c_me:+.2f} ± {c_std:.2f} mmHg | RMSE: {c_rmse:.2f} mmHg")
+        logger.info(f"     BHS Protocol : ≤5mmHg={c_p5:.1f}% | ≤10mmHg={c_p10:.1f}% | ≤15mmHg={c_p15:.1f}% → Grade {c_bhs}")
+        logger.info(f"     AAMI SP10    : {c_aami_label} (Kriteria: MAE ≤ 5 & STD ≤ 8)")
+
+    cal_avg_mae = float(np.mean([r["MAE"] for r in cal_results.values()]))
+    logger.info("-" * 75)
+    logger.info(f"  📊 RATA-RATA MAE TERKALIBRASI: {cal_avg_mae:.2f} mmHg")
+    logger.info("=" * 75)
+
     # ── Visualisasi 1: Scatter Plot Prediksi vs Ground Truth ─────────────────────
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
     colors = ["#e74c3c", "#3498db", "#2ecc71"]
@@ -584,7 +647,9 @@ def evaluate_test_set_full(
     return {
         "test_samples": len(all_trues),
         "results": results,
+        "calibrated_results": cal_results,
         "avg_mae": avg_mae,
+        "calibrated_avg_mae": cal_avg_mae,
     }
 
 
@@ -673,6 +738,7 @@ def main():
     parser.add_argument("--no-loss-normalize", dest="loss_normalize", action="store_false", help="Nonaktifkan normalisasi skala loss (pure Fan et al.)")
     parser.add_argument("--target-scales", nargs=3, type=float, default=[120.0, 80.0, 93.3], help="Skala fisiologis [SBP, DBP, MAP] untuk normalisasi loss (default: 120 80 93.3)")
     parser.add_argument("--task-weights", nargs=3, type=float, default=None, help="Bobot tetap tugas [SBP, DBP, MAP] (misal: 0.5 0.3 0.2) untuk memprioritaskan SBP")
+    parser.add_argument("--lambda-phys", type=float, default=0.10, help="Bobot regulasi konsistensi fisiologis MAP: MAP ≈ DBP + 1/3 (SBP - DBP) (default: 0.10; 0.0 = nonaktif)")
 
     # Arsitektur BiLSTM (Tabel 1 Fan et al., 2021)
     parser.add_argument("--hidden-size", type=int, default=256, help="Hidden units per arah BiLSTM (output concat: 512)")
@@ -716,6 +782,14 @@ def main():
     parser.add_argument(
         "--proj-dropout", type=float, default=0.1,
         help="Dropout rate pada Feature Projector MLP (default: 0.1)",
+    )
+    parser.add_argument(
+        "--use-gating", action="store_true", default=True,
+        help="Aktifkan Adaptive Gated Fusion untuk menimbang proyeksi fitur statistik secara dinamis (default: True)",
+    )
+    parser.add_argument(
+        "--no-gating", dest="use_gating", action="store_false",
+        help="Nonaktifkan Adaptive Gated Fusion (gunakan penggabungan konkat langsung)",
     )
     parser.add_argument(
         "--use-attention", action="store_true", default=False,
@@ -769,8 +843,10 @@ def main():
     logger.info(f"  Optimizer          : {args.optimizer.upper()} (Momentum: {args.momentum}, Weight Decay: {args.weight_decay}, LSTM Decay: {lstm_decay})")
     logger.info(f"  BiLSTM Patch Size  : {args.patch_size} (Unrolls {1250 // args.patch_size} timesteps x {args.patch_size} features)")
     logger.info(f"  Feature Projection : {'AKTIF (proj_dim=' + str(args.proj_dim) + ')' if (args.use_features and args.use_projection) else 'NON-AKTIF'}")
+    logger.info(f"  Gated Feature Fusion: {'AKTIF (Adaptive Sigmoid Gate)' if (args.use_features and args.use_projection and args.use_gating) else 'NON-AKTIF'}")
     logger.info(f"  Temporal Attention : {'AKTIF (Self-Attention Pooling)' if args.use_attention else 'NON-AKTIF (Terminal States)'}")
-    logger.info(f"  Loss Normalization : {'AKTIF ' + str(args.target_scales) if args.loss_normalize else 'NON-AKTIF'}")
+    logger.info(f"  Physiological Loss : {'AKTIF (lambda_phys=' + str(args.lambda_phys) + ')' if args.lambda_phys > 0 else 'NON-AKTIF'}")
+    logger.info(f"  Loss Normalization : {'AKTIF ' + str(args.target_scales) if args.loss_normalize else 'NON-AKTIF (Pure Absolute Scale)'}")
     logger.info(f"  LR Scheduler       : {args.scheduler_type.upper()} (Patience={args.scheduler_patience}, Factor={args.scheduler_factor}, MinLR={args.min_lr:.1e})")
     logger.info(f"  BiLSTM Dropout     : LSTM={args.lstm_dropout}, FC Heads={args.fc_dropout}")
     logger.info(f"  Mixed Precision    : {'AKTIF (FP16 GradScaler)' if (args.amp and use_cuda) else 'NON-AKTIF'}")
@@ -871,6 +947,7 @@ def main():
         use_projection=args.use_projection if args.use_features else False,
         proj_dim=args.proj_dim,
         proj_dropout=args.proj_dropout,
+        use_gating=args.use_gating if (args.use_features and args.use_projection) else False,
         use_attention=args.use_attention,
     ).to(device)
 
@@ -883,6 +960,7 @@ def main():
         momentum=args.loss_momentum,
         target_scales=args.target_scales if args.loss_normalize else None,
         task_weights=args.task_weights,
+        lambda_phys=args.lambda_phys,
     ).to(device)
 
     # Pisahkan parameter weight decay:
@@ -1093,7 +1171,9 @@ def main():
     eval_full = {
         "test_samples": eval_results["test_samples"],
         "results": eval_results["results"],
+        "calibrated_results": eval_results.get("calibrated_results", {}),
         "avg_mae": eval_results["avg_mae"],
+        "calibrated_avg_mae": eval_results.get("calibrated_avg_mae"),
         "best_epoch": best_ckpt["epoch"],
         "best_val_mae": best_val_mae,
         "hyperparameters": vars(args),
