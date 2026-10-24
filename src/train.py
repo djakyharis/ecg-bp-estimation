@@ -533,6 +533,9 @@ def evaluate_test_set_full(
     # ── Simulasi Kalibrasi Personal 1-Titik (Wearable Clinical Mode: AAMI SP10) ──
     # Pada skenario klinis wearable (Fan et al. Section 3 / AAMI SP10), kalibrasi 1-titik
     # mengoreksi pergeseran baseline personal pasien (offset hidrostatik & vaskular).
+    # PERINGATAN: dataset .npz TIDAK menyimpan ID pasien dan split bersifat acak, sehingga
+    # blok 10 sampel berurutan BUKAN sampel dari pasien yang sama. Angka kalibrasi di bawah
+    # hanya simulasi kasar (menambah noise) dan TIDAK valid untuk klaim klinis/skripsi.
     block_size = 10
     cal_preds = np.copy(all_preds)
     num_blocks = int(np.ceil(len(all_preds) / block_size))
@@ -547,7 +550,7 @@ def evaluate_test_set_full(
     cal_results = {}
 
     logger.info("\n" + "=" * 75)
-    logger.info("  EVALUASI DENGAN KALIBRASI 1-TITIK (WEARABLE CLINICAL MODE — AAMI SP10)")
+    logger.info("  [SIMULASI TIDAK VALID: tanpa ID pasien] KALIBRASI 1-TITIK (AAMI SP10)")
     logger.info("=" * 75)
 
     for i, name in enumerate(target_names):
