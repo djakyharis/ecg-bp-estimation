@@ -272,6 +272,12 @@ class ECGMultiTaskBiLSTM(nn.Module):
         if hasattr(self.map_head.net[-1], "bias") and self.map_head.net[-1].bias is not None:
             nn.init.constant_(self.map_head.net[-1].bias, 93.3)
 
+        # Inisialisasi bias gerbang gating adaptif ke 1.0 (Sigmoid(1.0) ≈ 0.73)
+        # agar fitur statistik morfologi aktif dimanfaatkan sejak epoch pertama
+        for fusion in [self.sbp_fusion, self.dbp_fusion, self.map_fusion]:
+            if fusion is not None and hasattr(fusion.gate[0], "bias") and fusion.gate[0].bias is not None:
+                nn.init.constant_(fusion.gate[0].bias, 1.0)
+
     def extract_features(self, x: torch.Tensor) -> torch.Tensor:
         """
         Mengekstrak representasi fitur terminal dari Shared BiLSTM Encoder.

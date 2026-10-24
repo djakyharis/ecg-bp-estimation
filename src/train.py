@@ -1194,6 +1194,7 @@ def main():
         "patch_size": args.patch_size,
         "use_projection": args.use_projection if args.use_features else False,
         "proj_dim": args.proj_dim,
+        "use_gating": args.use_gating if (args.use_features and args.use_projection) else False,
     }
     torch.save({
         "model_state_dict": model.state_dict(),
