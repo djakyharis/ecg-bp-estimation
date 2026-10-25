@@ -11,13 +11,13 @@
 
 ## 1. Ringkasan Eksekutif
 
-| Metrik (Test Set, 26.133 sampel) | SBP | DBP | MAP | **Rata-rata** |
-|---|:-:|:-:|:-:|:-:|
-| MAE (mmHg) | 8,45 | 4,42 | 4,75 | **5,87** |
-| Error STD (mmHg) | 12,59 | 6,84 | 7,19 | – |
-| Bias / ME (mmHg) | +0,29 | −0,26 | −0,30 | – |
-| BHS Grade | D | **A** | B | – |
-| Lolos AAMI (SD ≤ 8, bias kecil) | ❌ | ✅ | ✅ | – |
+| Metrik (Test Set, 26.133 sampel) |  SBP  |     DBP     |  MAP  | **Rata-rata** |
+| -------------------------------- | :---: | :---------: | :----: | :-----------------: |
+| MAE (mmHg)                       | 8,45 |    4,42    |  4,75  |   **5,87**   |
+| Error STD (mmHg)                 | 12,59 |    6,84    |  7,19  |         –         |
+| Bias / ME (mmHg)                 | +0,29 |   −0,26   | −0,30 |         –         |
+| BHS Grade                        |   D   | **A** |   B   |         –         |
+| Lolos AAMI (SD ≤ 8, bias kecil) |  ❌  |     ✅     |   ✅   |         –         |
 
 - **Target dosen (MAE < 10 mmHg) tercapai pada ketiga target**, termasuk SBP (8,45).
 - Rata-rata MAE turun dari **11,83 → 5,87** (≈ −50 %) dibanding model terbaik sebelumnya, dan **54 %
@@ -31,19 +31,19 @@
 
 ## 2. Konfigurasi Run
 
-| Parameter | Nilai |
-|---|---|
-| Hardware | NVIDIA L40 (44,3 GB), AMP FP16 |
-| Data | 12 part, 261.317 segmen termuat (13 berkas, lihat §6.2); Train 209.053 / Val 26.131 / Test 26.133 |
-| Fitur statistik | `all25` (SBP head +13, DBP head +12, MAP head +25 fitur) |
-| Arsitektur | BiLSTM 2-layer, hidden 256/arah, patch 25 (50 timestep), Feature Projector 64-dim, Gated Fusion, terminal states |
-| Parameter terlatih | 3.580.675 |
-| Optimizer | **AdamW**, lr 1e-3, weight decay 1e-4 (LSTM sama), grad clip 5,0 |
-| Scheduler | **Cosine** 1e-3 → 1e-5 selama 150 epoch |
-| Loss | **Smooth L1** (Huber), bobot tugas adaptif (Fan Eq. 8–10, floor 0,15, momentum 0,7), λ_phys = 0,10, tanpa normalisasi skala |
-| Dropout | LSTM = 0,0 · FC = 0,0 · projector = 0,1 |
-| Durasi | 94,8 menit (~38 dtk/epoch, 1.633 iterasi/epoch) |
-| Model terbaik | **Epoch 75** (Val avg MAE 5,866); 53 kali "★ BEST" |
+| Parameter          | Nilai                                                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Hardware           | NVIDIA L40 (44,3 GB), AMP FP16                                                                                                      |
+| Data               | 12 part, 261.317 segmen termuat (13 berkas, lihat §6.2); Train 209.053 / Val 26.131 / Test 26.133                                  |
+| Fitur statistik    | `all25` (SBP head +13, DBP head +12, MAP head +25 fitur)                                                                          |
+| Arsitektur         | BiLSTM 2-layer, hidden 256/arah, patch 25 (50 timestep), Feature Projector 64-dim, Gated Fusion, terminal states                    |
+| Parameter terlatih | 3.580.675                                                                                                                           |
+| Optimizer          | **AdamW**, lr 1e-3, weight decay 1e-4 (LSTM sama), grad clip 5,0                                                              |
+| Scheduler          | **Cosine** 1e-3 → 1e-5 selama 150 epoch                                                                                      |
+| Loss               | **Smooth L1** (Huber), bobot tugas adaptif (Fan Eq. 8–10, floor 0,15, momentum 0,7), λ_phys = 0,10, tanpa normalisasi skala |
+| Dropout            | LSTM = 0,0 · FC = 0,0 · projector = 0,1                                                                                           |
+| Durasi             | 94,8 menit (~38 dtk/epoch, 1.633 iterasi/epoch)                                                                                     |
+| Model terbaik      | **Epoch 75** (Val avg MAE 5,866); 53 kali "★ BEST"                                                                           |
 
 ---
 
@@ -53,17 +53,17 @@
 > Perbaikan `run_adamw_all` adalah gabungan **(a) data 10× lebih banyak** dan **(b) perubahan optimizer/loss/arsitektur**.
 > Efek (b) saja baru terlihat pada ablasi mini di §5.
 
-| Run | Data | Optimizer / Loss | Arsitektur | SBP | DBP | MAP | **Avg MAE** |
-|---|:-:|---|---|:-:|:-:|:-:|:-:|
-| *Baseline konstan (median)* | – | – | – | 18,23 | 9,04 | 10,75 | *12,67* |
-| `pure_bilstm_root` | 12 Part | SGD wd 0,1 / RMSE | 1250 step, tanpa fitur | 18,25 | 9,17 | 10,87 | 12,76 |
-| `run_top12` | Part 1 | SGD wd 0,1 / RMSE | 1250 step + 12 fitur | 17,43 | 9,06 | 10,73 | 12,40 |
-| `run_all25` | Part 1 | SGD wd 0,1 / RMSE | 1250 step + 25 fitur | 16,81 | 9,09 | 10,59 | 12,16 |
-| `run_patch50x25_gpu0` | Part 1 | SGD wd 0,1 / RMSE | Patch 50×25 + 25 fitur | 16,77 | 9,10 | 10,60 | 12,16 |
-| `run_patch_proj_gpu2` | Part 1 | SGD wd 0,1 / RMSE | Patch + Projector | 15,70 | 9,06 | 10,72 | 11,83 |
-| `run_full12_*` | Part 1 | SGD / RMSE **dibagi skala** | Patch + Projector/Attn | 21,01 | 11,40 | 10,77 | 14,39 |
-| **`run_adamw_all`** | **12 Part** | **AdamW / Smooth L1 + phys** | **Patch + Projector + Gating** | **8,45** | **4,42** | **4,75** | **5,87** |
-| *Fan et al. 2021 (acuan)* | 21.422 seg. bersih | SGD / RMSE adaptif | Patch 50×20 | 7,63 | 4,36 | 5,60 | 5,86 |
+| Run                           |        Data        | Optimizer / Loss                   | Arsitektur                           |      SBP      |      DBP      |      MAP      | **Avg MAE** |
+| ----------------------------- | :----------------: | ---------------------------------- | ------------------------------------ | :------------: | :------------: | :------------: | :---------------: |
+| *Baseline konstan (median)* |         –         | –                                 | –                                   |     18,23     |      9,04      |     10,75     |     *12,67*     |
+| `pure_bilstm_root`          |      12 Part      | SGD wd 0,1 / RMSE                  | 1250 step, tanpa fitur               |     18,25     |      9,17      |     10,87     |       12,76       |
+| `run_top12`                 |       Part 1       | SGD wd 0,1 / RMSE                  | 1250 step + 12 fitur                 |     17,43     |      9,06      |     10,73     |       12,40       |
+| `run_all25`                 |       Part 1       | SGD wd 0,1 / RMSE                  | 1250 step + 25 fitur                 |     16,81     |      9,09      |     10,59     |       12,16       |
+| `run_patch50x25_gpu0`       |       Part 1       | SGD wd 0,1 / RMSE                  | Patch 50×25 + 25 fitur              |     16,77     |      9,10      |     10,60     |       12,16       |
+| `run_patch_proj_gpu2`       |       Part 1       | SGD wd 0,1 / RMSE                  | Patch + Projector                    |     15,70     |      9,06      |     10,72     |       11,83       |
+| `run_full12_*`              |       Part 1       | SGD / RMSE **dibagi skala**  | Patch + Projector/Attn               |     21,01     |     11,40     |     10,77     |       14,39       |
+| **`run_adamw_all`**   | **12 Part** | **AdamW / Smooth L1 + phys** | **Patch + Projector + Gating** | **8,45** | **4,42** | **4,75** |  **5,87**  |
+| *Fan et al. 2021 (acuan)*   | 21.422 seg. bersih | SGD / RMSE adaptif                 | Patch 50×20                         |      7,63      |      4,36      |      5,60      |       5,86       |
 
 **Pembacaan kritis:**
 
@@ -83,17 +83,17 @@
 
 ## 4. Apa yang Berubah: Metode dan Arsitektur
 
-| # | Komponen | Sebelum | Sekarang | Alasan | Status bukti |
-|---|---|---|---|---|---|
-| 1 | **Optimizer** | SGD mom 0,9, wd 0,1 | AdamW lr 1e-3, wd 1e-4 | wd 0,1 menekan bobot ke ~0 | ✅ Ablasi mini: 14,49 → 12,68 (hanya turunkan wd) |
-| 2 | **Loss** | RMSE (L2) | Smooth L1 (≈ L1 untuk error > 1 mmHg) | Target dosen = MAE; tahan outlier ICU | ⚠️ Belum terisolasi |
-| 3 | **Scheduler** | Plateau (patience 10) | Cosine 1e-3 → 1e-5 | LR turun mulus, tidak terpotong dini | ⚠️ Belum terisolasi |
-| 4 | **Input patching** | 1250 timestep | 50 × 25 (0,2 dtk/patch) | BPTT 25× lebih pendek | ✅ Sudah ada di run lama (gain kecil saat optimizer salah) |
-| 5 | **Feature Projector** | Concat fitur mentah | Linear→LN→ReLU→Linear→ReLU (→64) | Cegah feature drowning | ✅ Run lama: SBP 16,77 → 15,70 |
-| 6 | **Gated Fusion** *(baru)* | Concat statis | `α=σ(W[h,f])`, `f·α`, bias gate = 1,0 | Model menimbang fitur per sampel | ❌ **Belum ada ablasi** |
-| 7 | **Physiological loss** *(baru)* | – | `λ·L(MAP, DBP+(SBP−DBP)/3)`, λ=0,1 | Konsistensi hemodinamik | ❌ **Belum ada ablasi** |
-| 8 | **Data** | Part 1 (±25 rb) | 12 Part (±261 rb) | Variasi pasien lebih banyak | ⚠️ Terkonfounding dengan #1–3 |
-| 9 | Loss normalization | Bug: dibagi 120/80/93 | Dimatikan (skala absolut) | Gradien 100× mengecil → macet di 21 mmHg | ✅ Run `full12_*` membuktikan jebakannya |
+| # | Komponen                                | Sebelum               | Sekarang                                      | Alasan                                     | Status bukti                                               |
+| - | --------------------------------------- | --------------------- | --------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------- |
+| 1 | **Optimizer**                     | SGD mom 0,9, wd 0,1   | AdamW lr 1e-3, wd 1e-4                        | wd 0,1 menekan bobot ke ~0                 | ✅ Ablasi mini: 14,49 → 12,68 (hanya turunkan wd)         |
+| 2 | **Loss**                          | RMSE (L2)             | Smooth L1 (≈ L1 untuk error > 1 mmHg)        | Target dosen = MAE; tahan outlier ICU      | ⚠️ Belum terisolasi                                      |
+| 3 | **Scheduler**                     | Plateau (patience 10) | Cosine 1e-3 → 1e-5                           | LR turun mulus, tidak terpotong dini       | ⚠️ Belum terisolasi                                      |
+| 4 | **Input patching**                | 1250 timestep         | 50 × 25 (0,2 dtk/patch)                      | BPTT 25× lebih pendek                     | ✅ Sudah ada di run lama (gain kecil saat optimizer salah) |
+| 5 | **Feature Projector**             | Concat fitur mentah   | Linear→LN→ReLU→Linear→ReLU (→64)         | Cegah feature drowning                     | ✅ Run lama: SBP 16,77 → 15,70                            |
+| 6 | **Gated Fusion** *(baru)*       | Concat statis         | `α=σ(W[h,f])`, `f·α`, bias gate = 1,0 | Model menimbang fitur per sampel           | ❌ **Belum ada ablasi**                              |
+| 7 | **Physiological loss** *(baru)* | –                    | `λ·L(MAP, DBP+(SBP−DBP)/3)`, λ=0,1      | Konsistensi hemodinamik                    | ❌ **Belum ada ablasi**                              |
+| 8 | **Data**                          | Part 1 (±25 rb)      | 12 Part (±261 rb)                            | Variasi pasien lebih banyak                | ⚠️ Terkonfounding dengan #1–3                           |
+| 9 | Loss normalization                      | Bug: dibagi 120/80/93 | Dimatikan (skala absolut)                     | Gradien 100× mengecil → macet di 21 mmHg | ✅ Run `full12_*` membuktikan jebakannya                 |
 
 > **Jujur soal atribusi:** yang terbukti hanya #1 (dan #9 sebagai pencegah kegagalan). Kontribusi **gating (#6)**,
 > **phys loss (#7)**, **smooth L1 (#2)**, dan **cosine (#3)** terhadap hasil akhir **belum terukur**. Jangan
@@ -119,11 +119,11 @@ DBP 12 fitur, MAP 25 fitur.
 Dijalankan saat audit (CPU/MPS, Part 1, **hanya 8.000 sampel, 12 epoch**, fitur `all25`). Ini indikasi arah,
 bukan hasil final.
 
-| Konfigurasi | Avg MAE (test 800) |
-|---|:-:|
-| A: SGD, wd 0,1 (konfigurasi lama) | 14,49 |
-| B: SGD, wd 1e-5 | 12,68 |
-| C: AdamW 1e-3, wd 1e-4, Smooth L1 | **9,86** |
+| Konfigurasi                       | Avg MAE (test 800) |
+| --------------------------------- | :----------------: |
+| A: SGD, wd 0,1 (konfigurasi lama) |       14,49       |
+| B: SGD, wd 1e-5                   |       12,68       |
+| C: AdamW 1e-3, wd 1e-4, Smooth L1 |   **9,86**   |
 
 B−A mengisolasi efek weight decay (−1,81). C−B mencampur tiga perubahan (AdamW + Smooth L1 + lr), sehingga
 **tidak bisa dipisah**. Satu seed, sampel kecil: variansi belum diketahui.
@@ -141,8 +141,12 @@ B−A mengisolasi efek weight decay (−1,81). C−B mencampur tiga perubahan (A
   di set train. Model dapat menang dengan mengenali *pasien/rekaman*, bukan hanya memetakan ECG → BP.
 - **Gejala di log yang konsisten dengan ini:** loss train 1,1 vs val ≈ 5,5 (gap ≈ 5×), val MAE mendatar sejak
   epoch ~50 sementara train loss terus turun hingga epoch 150.
-- Dampak: skor 5,87 = batas atas realistis untuk pasien yang sudah "dikenal". Untuk pasien baru kemungkinan
-  lebih buruk (besarnya belum diketahui). Fan et al. juga memakai random split, jadi perbandingan di §3 adil
+- Dampak: skor 5,87 = batas atas realistis untuk pasien yang sudah "dikenal". **Sudah diukur pada skala kecil**
+  (Part 1, 20 epoch, 1 seed): split acak 8,19 vs split lintas-rekaman 12,65 mmHg, dan pada split lintas-rekaman model
+  **kalah dari baseline tebak-median (10,18)**. Detail dan batasannya di
+  [ANALISIS_GENERALISASI_DAN_OPTIMASI_LANJUTAN.md](ANALISIS_GENERALISASI_DAN_OPTIMASI_LANJUTAN.md). Untuk model penuh
+  belum terukur; jalankan `--split-mode block` (langkah 0 di dokumen itu). Fan et al. juga memakai random split,
+  jadi perbandingan di §3 adil
   *secara protokol*, tetapi keduanya sama-sama optimistis.
 - **Mitigasi:** split per rekaman/pasien (§8, langkah 1). File `.npz` saat ini **tidak menyimpan ID rekaman**.
 
@@ -189,14 +193,14 @@ menambah akurasi** dan sedikit merusak.
 
 ### 6.8 🟡 Lintasan konvergensi (Val MAE)
 
-| Epoch | SBP | DBP | MAP | Avg | Catatan |
-|:-:|:-:|:-:|:-:|:-:|---|
-| 1 | 16,60 | 7,94 | 9,35 | 11,30 | DBP/MAP sudah lebih baik dari semua run lama; SBP setara run lama |
-| 20 | 12,61 | 5,54 | 6,14 | 8,10 | fase lambat |
-| 30 | 9,92 | 4,90 | 5,33 | 6,72 | fase penurunan SBP tajam (epoch 20–40) |
-| 50 | 8,78 | 4,43 | 4,82 | 6,01 | mulai mendatar |
-| 75 | 8,49 | 4,39 | 4,72 | **5,87** | **best** |
-| 150 | 8,64 | 4,52 | 4,89 | 6,02 | sedikit memburuk |
+| Epoch |  SBP  | DBP | MAP |      Avg      | Catatan                                                           |
+| :---: | :---: | :--: | :--: | :------------: | ----------------------------------------------------------------- |
+|   1   | 16,60 | 7,94 | 9,35 |     11,30     | DBP/MAP sudah lebih baik dari semua run lama; SBP setara run lama |
+|  20  | 12,61 | 5,54 | 6,14 |      8,10      | fase lambat                                                       |
+|  30  | 9,92 | 4,90 | 5,33 |      6,72      | fase penurunan SBP tajam (epoch 20–40)                           |
+|  50  | 8,78 | 4,43 | 4,82 |      6,01      | mulai mendatar                                                    |
+|  75  | 8,49 | 4,39 | 4,72 | **5,87** | **best**                                                    |
+|  150  | 8,64 | 4,52 | 4,89 |      6,02      | sedikit memburuk                                                  |
 
 Test (5,87) ≈ Val terbaik (5,87): tidak ada tanda *test peeking*, dan selisih val–test nol justru
 **konsisten dengan kebocoran** (val dan test sama-sama punya tetangga di train).
@@ -218,13 +222,13 @@ patch 50×25. Dataset kita lebih besar tetapi lebih bising; filter belum pernah 
 
 ## 7. Klaim yang Aman vs Tidak Aman untuk Skripsi
 
-| ✅ Aman ditulis | ❌ Jangan ditulis |
-|---|---|
-| "Pada protokol random-split 80/10/10 (seperti Fan et al.), MAE test SBP/DBP/MAP = 8,45/4,42/4,75 mmHg (rata-rata 5,87), memenuhi target < 10 mmHg." | "Model generalisasi ke pasien baru dengan MAE 5,87." |
-| "DBP mencapai BHS Grade A; MAP Grade B; SBP Grade D." | "Model lulus AAMI SP10" (SBP gagal, dan evaluasi bukan per-subjek). |
-| "Mengganti SGD(wd 0,1) dengan AdamW(wd 1e-4) menurunkan MAE pada ablasi terkontrol." | "Gated Fusion / physiological loss meningkatkan akurasi" (belum diablasi). |
-| "Baseline prediksi konstan MAE 12,67; model terlatih lama mendekati baseline ini." | Angka "terkalibrasi 1-titik" dari log. |
-| Keterbatasan: split per segmen, tanpa ID pasien, tanpa filter skewness. | "Hasil setara/mereplikasi Fan et al." |
+| ✅ Aman ditulis                                                                                                                                     | ❌ Jangan ditulis                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| "Pada protokol random-split 80/10/10 (seperti Fan et al.), MAE test SBP/DBP/MAP = 8,45/4,42/4,75 mmHg (rata-rata 5,87), memenuhi target < 10 mmHg." | "Model generalisasi ke pasien baru dengan MAE 5,87."                       |
+| "DBP mencapai BHS Grade A; MAP Grade B; SBP Grade D."                                                                                               | "Model lulus AAMI SP10" (SBP gagal, dan evaluasi bukan per-subjek).        |
+| "Mengganti SGD(wd 0,1) dengan AdamW(wd 1e-4) menurunkan MAE pada ablasi terkontrol."                                                                | "Gated Fusion / physiological loss meningkatkan akurasi" (belum diablasi). |
+| "Baseline prediksi konstan MAE 12,67; model terlatih lama mendekati baseline ini."                                                                  | Angka "terkalibrasi 1-titik" dari log.                                     |
+| Keterbatasan: split per segmen, tanpa ID pasien, tanpa filter skewness.                                                                             | "Hasil setara/mereplikasi Fan et al."                                      |
 
 ---
 

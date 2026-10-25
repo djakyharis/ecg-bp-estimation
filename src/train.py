@@ -189,6 +189,8 @@ def load_dataset_parts(
             npz_candidates = sorted(glob.glob(os.path.join(processed_dir, "*_clean.npz")))
             if not npz_candidates:
                 npz_candidates = sorted(glob.glob(os.path.join(processed_dir, "*_preprocessed.npz")))
+            # Berkas smoke-test (part_N_smoke_*) duplikat dari part aslinya -> jangan ikut dimuat
+            npz_candidates = [p for p in npz_candidates if "smoke" not in os.path.basename(p)]
             part_nums = [
                 os.path.splitext(os.path.basename(p))[0].replace("part_", "").replace("_clean", "").replace("_preprocessed", "")
                 for p in npz_candidates
@@ -756,6 +758,11 @@ def main():
     parser.add_argument("--num-workers", type=int, default=-1, help="DataLoader workers (-1 = otomatis: 4 di GPU, 0 di CPU)")
     parser.add_argument("--max-samples", type=int, default=None, help="Batas maksimal sampel (opsional, untuk smoke-test)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument(
+        "--split-mode", type=str, default="random", choices=["random", "block"],
+        help="'random' = acak per segmen (default, protokol Fan et al.; segmen bertetangga dari rekaman yang sama bisa bocor ke test). "
+             "'block' = potongan kontigu tanpa pengacakan (train=awal, val=tengah, test=akhir) sehingga test berisi rekaman yang tidak dilihat saat training.",
+    )
 
     # Fitur Statistik Terpandu (Nour et al. 2022 / Ilham Hakim 2025)
     parser.add_argument("--use-features", action="store_true", default=True, help="Gunakan fitur statistik terpandu (default: True)")
@@ -870,9 +877,28 @@ def main():
     val_len = int(0.10 * total_len)
     test_len = total_len - train_len - val_len
 
-    train_set, val_set, test_set = random_split(
-        dataset, [train_len, val_len, test_len],
-        generator=torch.Generator().manual_seed(args.seed)
+    if args.split_mode == "block":
+        # Tanpa pengacakan: segmen tersusun per rekaman, jadi test berisi rekaman yang tidak dilihat training.
+        # Catatan: batas blok belum tentu tepat di batas rekaman (tidak ada ID rekaman di .npz).
+        # Dengan --max-samples urutan ikut teracak, jadi jangan dipakai bersama mode ini.
+        all_idx = list(range(total_len))
+        train_set = torch.utils.data.Subset(dataset, all_idx[:train_len])
+        val_set = torch.utils.data.Subset(dataset, all_idx[train_len:train_len + val_len])
+        test_set = torch.utils.data.Subset(dataset, all_idx[train_len + val_len:])
+        logger.info("⚠️  Split Mode: BLOCK (kontigu, tanpa pengacakan, evaluasi lintas-rekaman)")
+    else:
+        train_set, val_set, test_set = random_split(
+            dataset, [train_len, val_len, test_len],
+            generator=torch.Generator().manual_seed(args.seed)
+        )
+
+    # Baseline pembanding: menebak median target train untuk semua sampel test (model harus mengalahkan ini)
+    _y_all = dataset.y.detach().cpu().numpy()
+    _med = np.median(_y_all[list(train_set.indices)], axis=0)
+    _base = np.abs(_y_all[list(test_set.indices)] - _med).mean(axis=0)
+    logger.info(
+        f"📏 Baseline tebak-median (test): SBP {_base[0]:.2f} | DBP {_base[1]:.2f} | MAP {_base[2]:.2f} "
+        f"| rata-rata {float(_base.mean()):.2f} mmHg  <- MAE model harus lebih rendah dari ini"
     )
 
     # Ekstraksi dan Injeksi Fitur Statistik (Nour et al. 2022 / Ilham Hakim 2025)

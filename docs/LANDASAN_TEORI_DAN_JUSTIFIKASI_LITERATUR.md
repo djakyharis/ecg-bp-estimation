@@ -7,14 +7,32 @@
 
 ---
 
+## 0. Status Verifikasi Sitasi (WAJIB DIBACA)
+
+> [!WARNING]
+> Versi awal dokumen ini memuat beberapa sitasi yang salah (judul/penulis/halaman). Sudah dikoreksi pada 26 Okt 2026.
+
+| Sitasi | Status |
+|---|---|
+| Fan et al. (2021), Sensors 21(5):1595 | ✅ Judul & penulis diverifikasi lewat pencarian web (halaman PolyU) |
+| Kachuee et al. (2017), IEEE TBME 64(4):859–869 | ✅ Judul/volume/halaman diverifikasi lewat pencarian web |
+| Nour et al. (2022) | ❌ **Metadata tidak ditemukan.** DOI yang saya tulis sebelumnya ternyata milik paper lain. Repo hanya menyebut "Nour et al. (2022)". Ambil judul/DOI dari skripsi Ilham Hakim (2025) |
+| Arevalo (2017), Raissi (2019), Girshick (2015), Loshchilov & Hutter (2017, 2019), Chen (2020), Nie (2023), Slapničar (2019), Guyton & Hall | ⚠️ Berasal dari pengetahuan saya, **belum dicek ulang pada sesi ini**. Cocokkan judul/halaman/DOI di Google Scholar sebelum masuk daftar pustaka |
+| Zhang (2023), Radu (2018), Schrumpf (2021) | 🗑️ Dihapus: tidak bisa diverifikasi dan kemungkinan besar salah |
+
+> [!NOTE]
+> Beberapa klaim "paper X membuktikan Y" di bawah adalah **penalaran saya**, bukan kutipan dari paper. Contoh: Slapničar (2019) tidak saya pastikan membahas ketahanan loss terhadap noise MIMIC. Baca paper aslinya sebelum menulis klaim itu sebagai hasil paper tersebut.
+
+---
+
 ## 1. Matriks Pemetaan Komponen Arsitektur ke Literatur Ilmiah
 
 | No | Komponen Arsitektur / Metode | Baseline Fan et al. (2021) | Modifikasi Skripsi Kita | Justifikasi Ilmiah Masalah | Paper Rujukan Utama |
 |:--:|---|---|---|---|---|
 | **1** | **Input Spatio-Temporal Patching** | $50 \times 20$ (100 Hz, 1000 titik) | **$50 \times 25$ (125 Hz, 1250 titik)** | Unrolling BiLSTM 1250 timestep menyebabkan *vanishing gradient* eksponensial. Patching 50 langkah (0,2 detik/patch) memotong BPTT 25× dan menangkap morfologi 1 gelombang jantung (P, QRS, atau T). | **Fan et al. (2021)** [MDPI Sensors]; **Nie et al. (2023, PatchTST)** [ICLR] |
-| **2** | **Ekstraksi Fitur Domain Statistik & Morfologi** | Tanpa fitur domain (pure raw ECG) | **25 Fitur Domain Medis (Set `all25`)** | ECG 1-lead mentah memiliki batas resolusi informasi vaskular. Fitur statistik momen, entropi, variabilitas puncak R-peak, dan energi Teager menginjeksi informasi elektrofisiologis terpandu. | **Nour et al. (2022)** [Appl. Sci.]; **Kachuee et al. (2017)** [IEEE TBME] |
-| **3** | **Feature Projector Subnet** | Penggabungan statis langsung | **MLP Projector Head (Linear→LN→ReLU→Linear 64-dim)** | Mencegah fenomena *feature drowning* (tenggelamnya 25 fitur statistik di samping 512 dimensi laten BiLSTM). Menyelaraskan skala representasi sebelum regresi. | **Chen et al. (2020, SimCLR)** [ICML]; **Radu et al. (2018)** [IEEE TMC] |
-| **4** | **Adaptive Gated Feature Fusion** | Penggabungan statis langsung | **Sigmoid Gating Unit ($\alpha \in [0, 1]$)** | Mengatasi fluktuasi kualitas sinyal ICU. Gerbang dinamis secara selektif memperkuat fitur statistik saat sinyal bersih dan meredam pengaruhnya saat sinyal terdistorsi noise. | **Arevalo et al. (2017, GMU)** [ICLR Workshop]; **Zhang et al. (2023)** [IEEE JBHI] |
+| **2** | **Ekstraksi Fitur Domain Statistik & Morfologi** | Tanpa fitur domain (pure raw ECG) | **25 Fitur Domain Medis (Set `all25`)** | ECG 1-lead mentah memiliki batas resolusi informasi vaskular. Fitur statistik momen, entropi, variabilitas puncak R-peak, dan energi Teager menginjeksi informasi elektrofisiologis terpandu. | **Nour et al. (2022)** [⚠️ metadata perlu diverifikasi]; **Kachuee et al. (2017)** [IEEE TBME] |
+| **3** | **Feature Projector Subnet** | Penggabungan statis langsung | **MLP Projector Head (Linear→LN→ReLU→Linear 64-dim)** | Mencegah fenomena *feature drowning* (tenggelamnya 25 fitur statistik di samping 512 dimensi laten BiLSTM). Menyelaraskan skala representasi sebelum regresi. | **Chen et al. (2020, SimCLR)** [ICML] |
+| **4** | **Adaptive Gated Feature Fusion** | Penggabungan statis langsung | **Sigmoid Gating Unit ($\alpha \in [0, 1]$)** | Mengatasi fluktuasi kualitas sinyal ICU. Gerbang dinamis secara selektif memperkuat fitur statistik saat sinyal bersih dan meredam pengaruhnya saat sinyal terdistorsi noise. | **Arevalo et al. (2017, GMU)** [ICLR Workshop] |
 | **5** | **Physiological Consistency Regularization** | Regresi multi-task independen | **Hemodynamic Loss Penalty ($\lambda_{\text{phys}} = 0,10$)** | Menghilangkan prediksi yang mustahil secara medis dengan memaksakan hukum hemodinamik kardiovaskular: $\text{MAP} \approx \text{DBP} + \frac{1}{3}(\text{SBP} - \text{DBP})$. | **Raissi et al. (2019, PINN)** [J. Comput. Phys.]; **Guyton & Hall (2006)** |
 | **6** | **Fungsi Loss Robust (Smooth L1 / Huber)** | RMSE Loss ($L_2$) | **Smooth L1 Loss (Huber, $\beta = 1,0$)** | Target evaluasi skripsi adalah MAE ($L_1$). RMSE memberi penalti kuadratik pada outlier ICU yang merusak update bobot. Smooth L1 linier untuk error $> 1$ mmHg sehingga tahan terhadap noise kateter. | **Girshick (2015, Fast R-CNN)** [ICCV]; **Slapničar et al. (2019)** [MDPI Sensors] |
 | **7** | **Optimizer & Scheduler** | SGD (momentum 0,9, weight decay 0,1) | **AdamW (lr 1e-3, wd 1e-4) + Cosine Annealing** | Weight decay 0,1 pada SGD menarik bobot recurrent LSTM ke nol ($|W| \approx 0,002$), membekukan model pada tebakan rata-rata. AdamW memisahkan weight decay dan Cosine Annealing menurunkan LR secara berangsur-angsur. | **Loshchilov & Hutter (2019, AdamW)** [ICLR]; **Loshchilov & Hutter (2017, Cosine)** [ICLR] |
@@ -29,7 +47,7 @@
   $$\Delta t = \frac{25}{125\text{ Hz}} = 0,20\text{ detik} = 200\text{ ms}$$
   Dalam elektrokardiografi klinis, durasi 200 ms adalah ukuran fisiologis standar yang membungkus tepat satu komponen gelombang: interval PR (120–200 ms), kompleks QRS (80–120 ms), atau segmen ST-T. Model hanya melakukan unrolling sebanyak 50 langkah, menstabilkan alur gradien.
 * **Sitasi Paper:**
-  > Fan, X., Yao, Q., Cai, Y., & Tsang, I. W. (2021). Cuffless blood pressure estimation using 1-lead ECG by BiLSTM with adaptive weight learning. *Sensors*, 21(5), 1595. https://doi.org/10.3390/s21051595
+  > Fan, X., Wang, H., Zhao, Y., Li, Y., & Tsui, K.-L. (2021). An adaptive weight learning-based multitask deep network for continuous blood pressure estimation using electrocardiogram signals. *Sensors*, 21(5), 1595. https://doi.org/10.3390/s21051595
 
 ---
 
@@ -37,8 +55,8 @@
 * **Konteks Masalah:** Sinyal ECG 1-lead mencatat aktivitas listrik depolarisasi dan repolarisasi miokardium. Meskipun BiLSTM mampu mengekstrak representasi sekuensial, fitur morfologi global seperti asimetri gelombang (skewness), ketajaman puncak R (kurtosis), dispersi energi (Teager-Kaiser Energy), dan keteraturan denyut (Shannon Entropy) memiliki korelasi fisiologis langsung terhadap resistensi vaskular sistemik.
 * **Solusi & Teori:** Mengintegrasikan 25 fitur statistik domain medis (Set `all25`) yang diekstraksi per jendela 10 detik sesuai metodologi Nour et al. (2022) dan Kachuee et al. (2017). Fitur distandarisasi menggunakan *z-score* berbasis parameter set pelatihan untuk mencegah kebocoran data (*data leakage*).
 * **Sitasi Paper:**
-  > Nour, M., Polat, K., & Guvenc, U. (2022). A novel approach for estimation of blood pressure from ECG signals based on deep learning and machine learning. *Applied Sciences*, 12(19), 9574. https://doi.org/10.3390/app12199574  
-  > Kachuee, M., Kiani, M. M., Mohammadzade, H., & Shabany, M. (2017). Cuffless high-accuracy calibration-free continuous blood pressure estimation using heartbeat waveforms. *IEEE Transactions on Biomedical Engineering*, 64(6), 1334–1343. https://doi.org/10.1109/TBME.2016.2618951
+  > Nour et al. (2022): **[BELUM TERVERIFIKASI]** repo hanya menyebut "Nour et al. (2022)" tanpa judul/DOI. Ambil metadata lengkap dari daftar pustaka skripsi Ilham Hakim (2025) atau dari paper aslinya.  
+  > Kachuee, M., Kiani, M. M., Mohammadzade, H., & Shabany, M. (2017). Cuffless blood pressure estimation algorithms for continuous health-care monitoring. *IEEE Transactions on Biomedical Engineering*, 64(4), 859–869.
 
 ---
 
@@ -61,7 +79,7 @@
   Bias gerbang $\mathbf{b}_g$ diinisialisasi ke nilai $+1,0$ sehingga $\sigma(1,0) \approx 0,73$, memastikan fitur domain langsung aktif berkontribusi sejak awal pelatihan.
 * **Sitasi Paper:**
   > Arevalo, J., Solorio, T., Montes-y-Gómez, M., & González, F. A. (2017). Gated multimodal units for information fusion. *ICLR Workshop 2017*. arXiv:1702.01992.  
-  > Zhang, Y., et al. (2023). Adaptive gated feature fusion for robust physiological signal monitoring. *IEEE Journal of Biomedical and Health Informatics*.
+  > (Rujukan tambahan penerapan gated fusion pada biosinyal: **cari dan verifikasi sendiri** lewat Google Scholar, kata kunci "gated fusion ECG"; tidak saya cantumkan karena belum terverifikasi.)
 
 ---
 
@@ -102,9 +120,9 @@
 ## 3. Format Daftar Pustaka (BibTeX & IEEE Style)
 
 ### Format IEEE (Siap Salin ke Word / LaTeX):
-1. X. Fan, Q. Yao, Y. Cai, and I. W. Tsang, "Cuffless blood pressure estimation using 1-lead ECG by BiLSTM with adaptive weight learning," *Sensors*, vol. 21, no. 5, p. 1595, 2021.
-2. M. Nour, K. Polat, and U. Guvenc, "A novel approach for estimation of blood pressure from ECG signals based on deep learning and machine learning," *Appl. Sci.*, vol. 12, no. 19, p. 9574, 2022.
-3. M. Kachuee, M. M. Kiani, H. Mohammadzade, and M. Shabany, "Cuffless high-accuracy calibration-free continuous blood pressure estimation using heartbeat waveforms," *IEEE Trans. Biomed. Eng.*, vol. 64, no. 6, pp. 1334–1343, 2017.
+1. X. Fan, H. Wang, Y. Zhao, Y. Li, and K.-L. Tsui, "An adaptive weight learning-based multitask deep network for continuous blood pressure estimation using electrocardiogram signals," *Sensors*, vol. 21, no. 5, p. 1595, 2021.
+2. [Nour et al., 2022: **belum terverifikasi**, lengkapi dari sumber asli]
+3. M. Kachuee, M. M. Kiani, H. Mohammadzade, and M. Shabany, "Cuffless blood pressure estimation algorithms for continuous health-care monitoring," *IEEE Trans. Biomed. Eng.*, vol. 64, no. 4, pp. 859–869, 2017.
 4. J. Arevalo, T. Solorio, M. Montes-y-Gómez, and F. A. González, "Gated multimodal units for information fusion," in *ICLR Workshop*, 2017.
 5. M. Raissi, P. Perdikaris, and G. E. Karniadakis, "Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations," *J. Comput. Phys.*, vol. 378, pp. 686–707, 2019.
 6. R. Girshick, "Fast R-CNN," in *Proc. IEEE Int. Conf. Comput. Vis. (ICCV)*, 2015, pp. 1440–1448.
@@ -117,9 +135,9 @@
 
 ### Format BibTeX (Untuk Pengguna Mendeley, Zotero, atau Overleaf):
 ```bibtex
-@article{fan2021cuffless,
-  title={Cuffless blood pressure estimation using 1-lead ECG by BiLSTM with adaptive weight learning},
-  author={Fan, Xiaomao and Yao, Quanbing and Cai, Yunpeng and Tsang, Ivor W},
+@article{fan2021adaptive,
+  title={An adaptive weight learning-based multitask deep network for continuous blood pressure estimation using electrocardiogram signals},
+  author={Fan, Xiaomao and Wang, Hailiang and Zhao, Yang and Li, Ye and Tsui, Kwok-Leung},
   journal={Sensors},
   volume={21},
   number={5},
@@ -128,27 +146,18 @@
   publisher={MDPI}
 }
 
-@article{nour2022novel,
-  title={A novel approach for estimation of blood pressure from ECG signals based on deep learning and machine learning},
-  author={Nour, Mostafa and Polat, Kemal and Guvenc, Ulas},
-  journal={Applied Sciences},
-  volume={12},
-  number={19},
-  pages={9574},
-  year={2022},
-  publisher={MDPI}
-}
-
 @article{kachuee2017cuffless,
-  title={Cuffless high-accuracy calibration-free continuous blood pressure estimation using heartbeat waveforms},
+  title={Cuffless blood pressure estimation algorithms for continuous health-care monitoring},
   author={Kachuee, Mohammad and Kiani, Mohammad Mahdi and Mohammadzade, Hoda and Shabany, Mahdi},
   journal={IEEE Transactions on Biomedical Engineering},
   volume={64},
-  number={6},
-  pages={1334--1343},
+  number={4},
+  pages={859--869},
   year={2017},
   publisher={IEEE}
 }
+
+% Nour et al. (2022): TIDAK dicantumkan, metadata belum terverifikasi.
 
 @inproceedings{arevalo2017gated,
   title={Gated multimodal units for information fusion},
