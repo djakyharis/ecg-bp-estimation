@@ -1,0 +1,181 @@
+[2026-10-26 00:55:03] ✅ Device Akselerator : CUDA (NVIDIA L40, VRAM: 44.3 GB)
+[2026-10-26 00:55:03] ===========================================================================
+[2026-10-26 00:55:03]   بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ (BISMILLAHIR-RAHMANIR-RAHIM)
+[2026-10-26 00:55:03]   PELATIHAN DEEP LEARNING: MULTI-TASK BiLSTM (ECG -> SBP/DBP/MAP)
+[2026-10-26 00:55:03]   Parameter & Metodologi Sesuai Paper Acuan: Fan et al. (2021, Sensors)
+[2026-10-26 00:55:03] ===========================================================================
+[2026-10-26 00:55:03]   Batch Size         : 128
+[2026-10-26 00:55:03]   Learning Rate      : 0.001
+[2026-10-26 00:55:03]   Optimizer          : ADAMW (Momentum: 0.9, Weight Decay: 0.0001, LSTM Decay: 0.0001)
+[2026-10-26 00:55:03]   BiLSTM Patch Size  : 25 (Unrolls 50 timesteps x 25 features)
+[2026-10-26 00:55:03]   Feature Projection : AKTIF (proj_dim=64)
+[2026-10-26 00:55:03]   Gated Feature Fusion: AKTIF (Adaptive Sigmoid Gate)
+[2026-10-26 00:55:03]   Temporal Attention : NON-AKTIF (Terminal States)
+[2026-10-26 00:55:03]   Physiological Loss : AKTIF (lambda_phys=0.1)
+[2026-10-26 00:55:03]   Loss Normalization : NON-AKTIF (Pure Absolute Scale)
+[2026-10-26 00:55:03]   LR Scheduler       : COSINE (Patience=10, Factor=0.8, MinLR=1.0e-05)
+[2026-10-26 00:55:03]   BiLSTM Dropout     : LSTM=0.0, FC Heads=0.0
+[2026-10-26 00:55:03]   Mixed Precision    : AKTIF (FP16 GradScaler)
+[2026-10-26 00:55:03]   DataLoader Workers : 8 (Pin Memory: True)
+[2026-10-26 00:55:03]   Folder Checkpoint  : checkpoints/run_adamw_block
+[2026-10-26 00:55:03]   File Log Aktif     : checkpoints/run_adamw_block/train.log
+[2026-10-26 00:55:03] ===========================================================================
+[2026-10-26 00:55:03] Memuat 12 berkas dataset preprocessed...
+[2026-10-26 00:55:03]   • part_10_preprocessed.npz (96.8 MB)
+[2026-10-26 00:55:03]   • part_11_preprocessed.npz (99.2 MB)
+[2026-10-26 00:55:03]   • part_12_preprocessed.npz (80.8 MB)
+[2026-10-26 00:55:03]   • part_1_preprocessed.npz (106.0 MB)
+[2026-10-26 00:55:03]   • part_2_preprocessed.npz (92.5 MB)
+[2026-10-26 00:55:03]   • part_3_preprocessed.npz (74.1 MB)
+[2026-10-26 00:55:03]   • part_4_preprocessed.npz (100.4 MB)
+[2026-10-26 00:55:03]   • part_5_preprocessed.npz (106.9 MB)
+[2026-10-26 00:55:03]   • part_6_preprocessed.npz (105.2 MB)
+[2026-10-26 00:55:03]   • part_7_preprocessed.npz (49.9 MB)
+[2026-10-26 00:55:03]   • part_8_preprocessed.npz (79.5 MB)
+[2026-10-26 00:55:03]   • part_9_preprocessed.npz (104.1 MB)
+[2026-10-26 00:57:40] Total sampel terkumpul: 261,117 epoch (10 detik @ 125 Hz)
+[2026-10-26 00:57:40] ⚠️  Split Mode: BLOCK (kontigu, tanpa pengacakan, evaluasi lintas-rekaman)
+[2026-10-26 00:57:40] 📏 Baseline tebak-median (test): SBP 18.37 | DBP 6.66 | MAP 8.91 | rata-rata 11.31 mmHg  <- MAE model harus lebih rendah dari ini
+[2026-10-26 00:57:40] 🔍 Mengekstrak 25 Fitur Statistik (set 'all25', Nour et al. 2022 / Ilham Hakim 2025)...
+[2026-10-26 01:18:37] ✅ Mode Hybrid Aktif: SBP Head (+13 fitur) | DBP Head (+12 fitur) | MAP Head (+25 fitur)
+[2026-10-26 01:18:37] 📊 Pembagian Data: Train=208,893 | Val=26,111 | Test=26,113
+[2026-10-26 01:18:37]    Jumlah Iterasi per Epoch: 1631 batch
+[2026-10-26 01:18:37] ✅ Inisialisasi Model: 3,580,675 parameter terlatih
+[2026-10-26 01:18:42] 
+🚀 Bismillahir-Rahmanir-Rahim, memulai proses pelatihan dari Epoch 1 hingga 80...
+[2026-10-26 01:19:22] Epoch [01/80] (39.5s) | TrLoss: 11.3351 | VlLoss: 12.9377 | Val MAE -> SBP: 20.38, DBP: 8.45, MAP: 10.94 mmHg ★ BEST | θ=[0.33, 0.33, 0.33] | LR=1.0e-03
+[2026-10-26 01:20:00] Epoch [02/80] (37.8s) | TrLoss: 10.6853 | VlLoss: 13.1932 | Val MAE -> SBP: 20.22, DBP: 8.56, MAP: 11.58 mmHg  | θ=[0.27, 0.27, 0.46] | LR=1.0e-03
+[2026-10-26 01:20:37] Epoch [03/80] (36.5s) | TrLoss: 9.9472 | VlLoss: 12.9525 | Val MAE -> SBP: 20.62, DBP: 8.70, MAP: 11.44 mmHg  | θ=[0.40, 0.24, 0.36] | LR=1.0e-03
+[2026-10-26 01:21:11] Epoch [04/80] (33.7s) | TrLoss: 10.6038 | VlLoss: 14.3818 | Val MAE -> SBP: 20.62, DBP: 8.87, MAP: 11.70 mmHg  | θ=[0.32, 0.30, 0.38] | LR=9.9e-04
+[2026-10-26 01:21:47] Epoch [05/80] (36.4s) | TrLoss: 9.7634 | VlLoss: 13.2405 | Val MAE -> SBP: 20.32, DBP: 8.68, MAP: 11.42 mmHg  | θ=[0.27, 0.33, 0.41] | LR=9.9e-04
+[2026-10-26 01:22:22] Epoch [06/80] (34.7s) | TrLoss: 9.1454 | VlLoss: 13.4190 | Val MAE -> SBP: 21.23, DBP: 9.45, MAP: 11.89 mmHg  | θ=[0.23, 0.43, 0.34] | LR=9.9e-04
+[2026-10-26 01:22:58] Epoch [07/80] (35.1s) | TrLoss: 8.6211 | VlLoss: 12.9219 | Val MAE -> SBP: 20.96, DBP: 9.30, MAP: 12.34 mmHg  | θ=[0.21, 0.37, 0.42] | LR=9.8e-04
+[2026-10-26 01:23:34] Epoch [08/80] (36.0s) | TrLoss: 8.3209 | VlLoss: 12.7156 | Val MAE -> SBP: 21.16, DBP: 9.42, MAP: 11.86 mmHg  | θ=[0.18, 0.30, 0.52] | LR=9.8e-04
+[2026-10-26 01:24:11] Epoch [09/80] (36.7s) | TrLoss: 8.0248 | VlLoss: 12.5661 | Val MAE -> SBP: 21.03, DBP: 9.10, MAP: 11.81 mmHg  | θ=[0.17, 0.34, 0.49] | LR=9.7e-04
+[2026-10-26 01:24:45] Epoch [10/80] (33.1s) | TrLoss: 7.7506 | VlLoss: 12.5228 | Val MAE -> SBP: 21.28, DBP: 9.39, MAP: 11.77 mmHg  | θ=[0.29, 0.33, 0.38] | LR=9.6e-04
+[2026-10-26 01:25:21] Epoch [11/80] (36.4s) | TrLoss: 8.3756 | VlLoss: 13.5715 | Val MAE -> SBP: 21.36, DBP: 9.11, MAP: 11.86 mmHg  | θ=[0.24, 0.38, 0.38] | LR=9.5e-04
+[2026-10-26 01:25:57] Epoch [12/80] (35.1s) | TrLoss: 7.8513 | VlLoss: 13.3156 | Val MAE -> SBP: 21.41, DBP: 9.82, MAP: 11.97 mmHg  | θ=[0.21, 0.49, 0.31] | LR=9.5e-04
+[2026-10-26 01:26:35] Epoch [13/80] (37.9s) | TrLoss: 7.3817 | VlLoss: 12.8705 | Val MAE -> SBP: 22.14, DBP: 9.74, MAP: 11.97 mmHg  | θ=[0.37, 0.38, 0.25] | LR=9.4e-04
+[2026-10-26 01:27:09] Epoch [14/80] (33.9s) | TrLoss: 8.3586 | VlLoss: 14.6553 | Val MAE -> SBP: 21.97, DBP: 9.67, MAP: 11.93 mmHg  | θ=[0.49, 0.30, 0.21] | LR=9.3e-04
+[2026-10-26 01:27:43] Epoch [15/80] (33.2s) | TrLoss: 8.9672 | VlLoss: 15.5659 | Val MAE -> SBP: 21.43, DBP: 9.31, MAP: 11.59 mmHg  | θ=[0.39, 0.32, 0.30] | LR=9.2e-04
+[2026-10-26 01:28:13] Epoch [16/80] (30.1s) | TrLoss: 8.1790 | VlLoss: 14.8563 | Val MAE -> SBP: 21.69, DBP: 9.75, MAP: 11.83 mmHg  | θ=[0.35, 0.40, 0.25] | LR=9.1e-04
+[2026-10-26 01:28:44] Epoch [17/80] (30.9s) | TrLoss: 7.7201 | VlLoss: 14.3835 | Val MAE -> SBP: 22.28, DBP: 9.42, MAP: 11.70 mmHg  | θ=[0.37, 0.41, 0.22] | LR=8.9e-04
+[2026-10-26 01:29:23] Epoch [18/80] (37.9s) | TrLoss: 7.6185 | VlLoss: 14.1800 | Val MAE -> SBP: 21.40, DBP: 9.31, MAP: 11.81 mmHg  | θ=[0.49, 0.33, 0.19] | LR=8.8e-04
+[2026-10-26 01:29:59] Epoch [19/80] (36.3s) | TrLoss: 8.1294 | VlLoss: 15.7299 | Val MAE -> SBP: 21.75, DBP: 9.34, MAP: 11.92 mmHg  | θ=[0.55, 0.27, 0.18] | LR=8.7e-04
+[2026-10-26 01:30:39] Epoch [20/80] (39.1s) | TrLoss: 8.3036 | VlLoss: 16.4351 | Val MAE -> SBP: 21.67, DBP: 9.40, MAP: 11.92 mmHg  | θ=[0.49, 0.34, 0.17] | LR=8.6e-04
+[2026-10-26 01:31:17] Epoch [21/80] (37.9s) | TrLoss: 7.7663 | VlLoss: 15.8213 | Val MAE -> SBP: 22.24, DBP: 9.09, MAP: 11.81 mmHg  | θ=[0.39, 0.45, 0.16] | LR=8.4e-04
+[2026-10-26 01:31:52] Epoch [22/80] (34.7s) | TrLoss: 7.0300 | VlLoss: 14.6464 | Val MAE -> SBP: 22.15, DBP: 9.37, MAP: 11.90 mmHg  | θ=[0.32, 0.52, 0.16] | LR=8.3e-04
+[2026-10-26 01:32:29] Epoch [23/80] (36.5s) | TrLoss: 6.4520 | VlLoss: 13.2647 | Val MAE -> SBP: 21.39, DBP: 9.13, MAP: 11.68 mmHg  | θ=[0.45, 0.40, 0.15] | LR=8.1e-04
+[2026-10-26 01:33:09] Epoch [24/80] (39.8s) | TrLoss: 6.9376 | VlLoss: 15.0733 | Val MAE -> SBP: 21.63, DBP: 9.32, MAP: 11.85 mmHg  | θ=[0.48, 0.34, 0.18] | LR=8.0e-04
+[2026-10-26 01:33:46] Epoch [25/80] (36.8s) | TrLoss: 6.9550 | VlLoss: 15.4311 | Val MAE -> SBP: 21.75, DBP: 9.01, MAP: 11.60 mmHg  | θ=[0.38, 0.31, 0.31] | LR=7.8e-04
+[2026-10-26 01:34:24] Epoch [26/80] (37.5s) | TrLoss: 6.3810 | VlLoss: 14.8015 | Val MAE -> SBP: 22.35, DBP: 9.09, MAP: 11.76 mmHg  | θ=[0.49, 0.25, 0.26] | LR=7.6e-04
+[2026-10-26 01:34:59] Epoch [27/80] (34.7s) | TrLoss: 6.6862 | VlLoss: 15.8827 | Val MAE -> SBP: 21.69, DBP: 9.25, MAP: 11.88 mmHg  | θ=[0.56, 0.22, 0.22] | LR=7.5e-04
+[2026-10-26 01:35:33] Epoch [28/80] (33.6s) | TrLoss: 6.8581 | VlLoss: 16.9400 | Val MAE -> SBP: 22.11, DBP: 9.35, MAP: 11.73 mmHg  | θ=[0.58, 0.20, 0.21] | LR=7.3e-04
+[2026-10-26 01:36:12] Epoch [29/80] (38.3s) | TrLoss: 6.7942 | VlLoss: 17.3044 | Val MAE -> SBP: 22.32, DBP: 9.15, MAP: 12.05 mmHg  | θ=[0.52, 0.29, 0.19] | LR=7.1e-04
+[2026-10-26 01:36:49] Epoch [30/80] (37.0s) | TrLoss: 6.3814 | VlLoss: 16.3774 | Val MAE -> SBP: 22.14, DBP: 9.26, MAP: 12.13 mmHg  | θ=[0.49, 0.30, 0.21] | LR=6.9e-04
+[2026-10-26 01:37:29] Epoch [31/80] (40.0s) | TrLoss: 6.1060 | VlLoss: 16.0080 | Val MAE -> SBP: 22.11, DBP: 9.24, MAP: 12.02 mmHg  | θ=[0.38, 0.25, 0.37] | LR=6.8e-04
+[2026-10-26 01:38:07] Epoch [32/80] (37.8s) | TrLoss: 5.5937 | VlLoss: 15.2773 | Val MAE -> SBP: 22.33, DBP: 9.45, MAP: 12.21 mmHg  | θ=[0.38, 0.28, 0.34] | LR=6.6e-04
+[2026-10-26 01:38:44] Epoch [33/80] (36.2s) | TrLoss: 5.4458 | VlLoss: 15.2370 | Val MAE -> SBP: 22.49, DBP: 9.40, MAP: 12.15 mmHg  | θ=[0.31, 0.33, 0.36] | LR=6.4e-04
+[2026-10-26 01:39:21] Epoch [34/80] (36.7s) | TrLoss: 5.0598 | VlLoss: 14.1746 | Val MAE -> SBP: 22.20, DBP: 9.34, MAP: 12.09 mmHg  | θ=[0.44, 0.27, 0.29] | LR=6.2e-04
+[2026-10-26 01:39:58] Epoch [35/80] (37.2s) | TrLoss: 5.3632 | VlLoss: 15.8619 | Val MAE -> SBP: 22.41, DBP: 9.48, MAP: 12.37 mmHg  | θ=[0.36, 0.29, 0.35] | LR=6.0e-04
+[2026-10-26 01:40:31] Epoch [36/80] (32.7s) | TrLoss: 5.0161 | VlLoss: 14.9503 | Val MAE -> SBP: 22.17, DBP: 9.50, MAP: 12.34 mmHg  | θ=[0.43, 0.25, 0.32] | LR=5.8e-04
+[2026-10-26 01:41:07] Epoch [37/80] (35.5s) | TrLoss: 5.1127 | VlLoss: 15.9259 | Val MAE -> SBP: 22.57, DBP: 9.31, MAP: 12.47 mmHg  | θ=[0.37, 0.28, 0.36] | LR=5.6e-04
+[2026-10-26 01:41:42] Epoch [38/80] (34.9s) | TrLoss: 4.8186 | VlLoss: 15.3672 | Val MAE -> SBP: 23.00, DBP: 9.45, MAP: 12.36 mmHg  | θ=[0.45, 0.26, 0.29] | LR=5.4e-04
+[2026-10-26 01:42:19] Epoch [39/80] (36.5s) | TrLoss: 4.9306 | VlLoss: 16.0146 | Val MAE -> SBP: 22.73, DBP: 9.25, MAP: 12.22 mmHg  | θ=[0.37, 0.37, 0.26] | LR=5.2e-04
+[2026-10-26 01:42:55] Epoch [40/80] (35.2s) | TrLoss: 4.6171 | VlLoss: 14.9708 | Val MAE -> SBP: 22.63, DBP: 9.46, MAP: 12.45 mmHg  | θ=[0.30, 0.37, 0.33] | LR=5.1e-04
+[2026-10-26 01:43:33] Epoch [41/80] (38.1s) | TrLoss: 4.3271 | VlLoss: 14.0010 | Val MAE -> SBP: 22.21, DBP: 9.21, MAP: 12.28 mmHg  | θ=[0.25, 0.45, 0.30] | LR=4.9e-04
+[2026-10-26 01:44:15] Epoch [42/80] (41.4s) | TrLoss: 4.0960 | VlLoss: 13.4059 | Val MAE -> SBP: 22.45, DBP: 9.35, MAP: 12.29 mmHg  | θ=[0.21, 0.53, 0.25] | LR=4.7e-04
+[2026-10-26 01:44:52] Epoch [43/80] (36.6s) | TrLoss: 3.9020 | VlLoss: 12.7014 | Val MAE -> SBP: 22.34, DBP: 9.29, MAP: 12.15 mmHg  | θ=[0.20, 0.48, 0.32] | LR=4.5e-04
+[2026-10-26 01:45:28] Epoch [44/80] (36.0s) | TrLoss: 3.7929 | VlLoss: 12.8002 | Val MAE -> SBP: 22.30, DBP: 9.34, MAP: 12.36 mmHg  | θ=[0.18, 0.37, 0.45] | LR=4.3e-04
+[2026-10-26 01:46:05] Epoch [45/80] (36.4s) | TrLoss: 3.6745 | VlLoss: 12.9547 | Val MAE -> SBP: 22.58, DBP: 9.25, MAP: 12.44 mmHg  | θ=[0.26, 0.38, 0.36] | LR=4.1e-04
+[2026-10-26 01:46:44] Epoch [46/80] (38.5s) | TrLoss: 3.7989 | VlLoss: 13.7138 | Val MAE -> SBP: 22.68, DBP: 9.33, MAP: 12.18 mmHg  | θ=[0.25, 0.36, 0.39] | LR=3.9e-04
+[2026-10-26 01:47:22] Epoch [47/80] (37.8s) | TrLoss: 3.6921 | VlLoss: 13.5850 | Val MAE -> SBP: 22.42, DBP: 9.44, MAP: 12.19 mmHg  | θ=[0.34, 0.34, 0.32] | LR=3.7e-04
+[2026-10-26 01:48:01] Epoch [48/80] (38.6s) | TrLoss: 3.8527 | VlLoss: 14.7132 | Val MAE -> SBP: 22.59, DBP: 9.51, MAP: 12.23 mmHg  | θ=[0.28, 0.46, 0.26] | LR=3.5e-04
+[2026-10-26 01:48:38] Epoch [49/80] (37.0s) | TrLoss: 3.6349 | VlLoss: 13.7158 | Val MAE -> SBP: 22.59, DBP: 9.45, MAP: 12.25 mmHg  | θ=[0.24, 0.50, 0.27] | LR=3.3e-04
+[2026-10-26 01:49:15] Epoch [50/80] (36.8s) | TrLoss: 3.4684 | VlLoss: 13.2679 | Val MAE -> SBP: 22.52, DBP: 9.59, MAP: 12.36 mmHg  | θ=[0.21, 0.42, 0.37] | LR=3.2e-04
+[2026-10-26 01:49:54] Epoch [51/80] (38.8s) | TrLoss: 3.3538 | VlLoss: 13.1102 | Val MAE -> SBP: 22.48, DBP: 9.45, MAP: 12.25 mmHg  | θ=[0.26, 0.44, 0.30] | LR=3.0e-04
+[2026-10-26 01:50:32] Epoch [52/80] (37.7s) | TrLoss: 3.3957 | VlLoss: 13.5649 | Val MAE -> SBP: 22.59, DBP: 9.41, MAP: 12.21 mmHg  | θ=[0.36, 0.39, 0.26] | LR=2.8e-04
+[2026-10-26 01:51:10] Epoch [53/80] (37.1s) | TrLoss: 3.5556 | VlLoss: 14.7708 | Val MAE -> SBP: 22.54, DBP: 9.54, MAP: 12.27 mmHg  | θ=[0.30, 0.48, 0.22] | LR=2.6e-04
+[2026-10-26 01:51:45] Epoch [54/80] (35.2s) | TrLoss: 3.3644 | VlLoss: 13.8875 | Val MAE -> SBP: 22.64, DBP: 9.47, MAP: 12.27 mmHg  | θ=[0.33, 0.48, 0.19] | LR=2.5e-04
+[2026-10-26 01:52:24] Epoch [55/80] (38.5s) | TrLoss: 3.3719 | VlLoss: 14.1461 | Val MAE -> SBP: 22.49, DBP: 9.44, MAP: 12.16 mmHg  | θ=[0.30, 0.38, 0.32] | LR=2.3e-04
+[2026-10-26 01:53:03] Epoch [56/80] (38.8s) | TrLoss: 3.2719 | VlLoss: 14.2881 | Val MAE -> SBP: 22.77, DBP: 9.55, MAP: 12.34 mmHg  | θ=[0.31, 0.30, 0.38] | LR=2.1e-04
+[2026-10-26 01:53:41] Epoch [57/80] (37.2s) | TrLoss: 3.2435 | VlLoss: 14.5458 | Val MAE -> SBP: 22.76, DBP: 9.46, MAP: 12.15 mmHg  | θ=[0.26, 0.27, 0.48] | LR=2.0e-04
+[2026-10-26 01:54:18] Epoch [58/80] (36.7s) | TrLoss: 3.0862 | VlLoss: 14.1334 | Val MAE -> SBP: 22.65, DBP: 9.51, MAP: 12.31 mmHg  | θ=[0.24, 0.25, 0.51] | LR=1.8e-04
+[2026-10-26 01:54:57] Epoch [59/80] (38.7s) | TrLoss: 2.9920 | VlLoss: 13.8867 | Val MAE -> SBP: 22.67, DBP: 9.45, MAP: 12.25 mmHg  | θ=[0.20, 0.37, 0.43] | LR=1.7e-04
+[2026-10-26 01:55:34] Epoch [60/80] (36.6s) | TrLoss: 2.8997 | VlLoss: 13.2196 | Val MAE -> SBP: 22.64, DBP: 9.43, MAP: 12.22 mmHg  | θ=[0.23, 0.35, 0.41] | LR=1.5e-04
+[2026-10-26 01:56:09] Epoch [61/80] (34.6s) | TrLoss: 2.9015 | VlLoss: 13.6006 | Val MAE -> SBP: 22.65, DBP: 9.48, MAP: 12.30 mmHg  | θ=[0.20, 0.29, 0.51] | LR=1.4e-04
+[2026-10-26 01:56:48] Epoch [62/80] (38.8s) | TrLoss: 2.8035 | VlLoss: 13.4642 | Val MAE -> SBP: 22.62, DBP: 9.46, MAP: 12.31 mmHg  | θ=[0.28, 0.29, 0.44] | LR=1.3e-04
+[2026-10-26 01:57:27] Epoch [63/80] (39.2s) | TrLoss: 2.9025 | VlLoss: 14.3439 | Val MAE -> SBP: 22.88, DBP: 9.52, MAP: 12.34 mmHg  | θ=[0.42, 0.24, 0.35] | LR=1.2e-04
+[2026-10-26 01:58:03] Epoch [64/80] (35.7s) | TrLoss: 3.1280 | VlLoss: 15.9855 | Val MAE -> SBP: 22.93, DBP: 9.51, MAP: 12.34 mmHg  | θ=[0.52, 0.20, 0.28] | LR=1.0e-04
+[2026-10-26 01:58:35] Epoch [65/80] (30.8s) | TrLoss: 3.2591 | VlLoss: 16.9804 | Val MAE -> SBP: 22.70, DBP: 9.48, MAP: 12.29 mmHg  | θ=[0.58, 0.18, 0.24] | LR=9.3e-05
+[2026-10-26 01:59:13] Epoch [66/80] (37.7s) | TrLoss: 3.3282 | VlLoss: 17.7472 | Val MAE -> SBP: 22.79, DBP: 9.49, MAP: 12.30 mmHg  | θ=[0.63, 0.16, 0.20] | LR=8.3e-05
+[2026-10-26 01:59:49] Epoch [67/80] (35.8s) | TrLoss: 3.3790 | VlLoss: 18.3856 | Val MAE -> SBP: 22.81, DBP: 9.44, MAP: 12.30 mmHg  | θ=[0.51, 0.31, 0.18] | LR=7.3e-05
+[2026-10-26 02:00:23] Epoch [68/80] (34.3s) | TrLoss: 3.1574 | VlLoss: 16.7011 | Val MAE -> SBP: 22.76, DBP: 9.51, MAP: 12.30 mmHg  | θ=[0.40, 0.44, 0.16] | LR=6.4e-05
+[2026-10-26 02:01:00] Epoch [69/80] (36.3s) | TrLoss: 2.9501 | VlLoss: 15.0588 | Val MAE -> SBP: 22.74, DBP: 9.48, MAP: 12.25 mmHg  | θ=[0.41, 0.36, 0.24] | LR=5.5e-05
+[2026-10-26 02:01:29] Epoch [70/80] (29.2s) | TrLoss: 2.9424 | VlLoss: 15.4688 | Val MAE -> SBP: 22.80, DBP: 9.50, MAP: 12.26 mmHg  | θ=[0.49, 0.30, 0.20] | LR=4.8e-05
+[2026-10-26 02:02:02] Epoch [71/80] (32.3s) | TrLoss: 3.0450 | VlLoss: 16.5427 | Val MAE -> SBP: 22.86, DBP: 9.51, MAP: 12.28 mmHg  | θ=[0.47, 0.28, 0.26] | LR=4.1e-05
+[2026-10-26 02:02:37] Epoch [72/80] (34.5s) | TrLoss: 2.9878 | VlLoss: 16.3189 | Val MAE -> SBP: 22.82, DBP: 9.49, MAP: 12.23 mmHg  | θ=[0.39, 0.27, 0.34] | LR=3.4e-05
+[2026-10-26 02:03:13] Epoch [73/80] (35.8s) | TrLoss: 2.8509 | VlLoss: 15.5017 | Val MAE -> SBP: 22.83, DBP: 9.52, MAP: 12.31 mmHg  | θ=[0.31, 0.23, 0.47] | LR=2.9e-05
+[2026-10-26 02:03:50] Epoch [74/80] (36.5s) | TrLoss: 2.7145 | VlLoss: 14.7699 | Val MAE -> SBP: 22.81, DBP: 9.50, MAP: 12.27 mmHg  | θ=[0.25, 0.20, 0.55] | LR=2.4e-05
+[2026-10-26 02:04:24] Epoch [75/80] (34.3s) | TrLoss: 2.6158 | VlLoss: 14.2799 | Val MAE -> SBP: 22.83, DBP: 9.49, MAP: 12.28 mmHg  | θ=[0.28, 0.19, 0.53] | LR=2.0e-05
+[2026-10-26 02:04:58] Epoch [76/80] (33.1s) | TrLoss: 2.6388 | VlLoss: 14.5642 | Val MAE -> SBP: 22.86, DBP: 9.49, MAP: 12.29 mmHg  | θ=[0.40, 0.18, 0.41] | LR=1.6e-05
+[2026-10-26 02:05:36] Epoch [77/80] (37.9s) | TrLoss: 2.8170 | VlLoss: 15.9264 | Val MAE -> SBP: 22.84, DBP: 9.49, MAP: 12.30 mmHg  | θ=[0.32, 0.35, 0.33] | LR=1.3e-05
+[2026-10-26 02:06:13] Epoch [78/80] (36.4s) | TrLoss: 2.7110 | VlLoss: 14.6144 | Val MAE -> SBP: 22.83, DBP: 9.49, MAP: 12.30 mmHg  | θ=[0.33, 0.34, 0.33] | LR=1.2e-05
+[2026-10-26 02:06:48] Epoch [79/80] (34.9s) | TrLoss: 2.7186 | VlLoss: 14.7708 | Val MAE -> SBP: 22.86, DBP: 9.51, MAP: 12.31 mmHg  | θ=[0.33, 0.37, 0.30] | LR=1.0e-05
+[2026-10-26 02:07:22] Epoch [80/80] (34.2s) | TrLoss: 2.7146 | VlLoss: 14.6318 | Val MAE -> SBP: 22.85, DBP: 9.50, MAP: 12.31 mmHg  | θ=[0.29, 0.46, 0.25] | LR=1.0e-05
+[2026-10-26 02:07:22] ===========================================================================
+[2026-10-26 02:07:22] 🎉 Pelatihan Selesai dalam 48.7 menit (0.81 jam)!
+[2026-10-26 02:07:22] Model terbaik tersimpan di: checkpoints/run_adamw_block/best_model.pt (Best Avg Val MAE: 13.26 mmHg)
+[2026-10-26 02:07:24] 📈 Grafik kurva pelatihan tersimpan: checkpoints/run_adamw_block/training_curves.png
+[2026-10-26 02:07:24] 
+Memuat model terbaik untuk evaluasi akhir pada Test Set...
+[2026-10-26 02:07:24] 
+===========================================================================
+[2026-10-26 02:07:24]   EVALUASI AKHIR TEST SET (UNSEEN DATA) — STANDAR BHS & AAMI SP10
+[2026-10-26 02:07:24] ===========================================================================
+[2026-10-26 02:07:26] 
+  🎯 SBP:
+[2026-10-26 02:07:26]      MAE: 17.03 mmHg | ME (Bias): +3.76 ± 20.80 mmHg | RMSE: 21.14 mmHg
+[2026-10-26 02:07:26]      BHS Protocol : ≤5mmHg=18.6% | ≤10mmHg=35.4% | ≤15mmHg=50.8% → Grade D
+[2026-10-26 02:07:26]      AAMI SP10    : ❌ GAGAL (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-26 02:07:26] 
+  🎯 DBP:
+[2026-10-26 02:07:26]      MAE: 6.77 mmHg | ME (Bias): +1.85 ± 8.41 mmHg | RMSE: 8.61 mmHg
+[2026-10-26 02:07:26]      BHS Protocol : ≤5mmHg=45.1% | ≤10mmHg=76.1% | ≤15mmHg=92.6% → Grade C
+[2026-10-26 02:07:26]      AAMI SP10    : ❌ GAGAL (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-26 02:07:26] 
+  🎯 MAP:
+[2026-10-26 02:07:26]      MAE: 8.84 mmHg | ME (Bias): +0.61 ± 11.03 mmHg | RMSE: 11.04 mmHg
+[2026-10-26 02:07:26]      BHS Protocol : ≤5mmHg=34.4% | ≤10mmHg=63.2% | ≤15mmHg=82.8% → Grade D
+[2026-10-26 02:07:26]      AAMI SP10    : ❌ GAGAL (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-26 02:07:26] ---------------------------------------------------------------------------
+[2026-10-26 02:07:26]   📊 RATA-RATA MAE KESELURUHAN: 10.88 mmHg
+[2026-10-26 02:07:26] ===========================================================================
+[2026-10-26 02:07:26] 
+===========================================================================
+[2026-10-26 02:07:26]   [SIMULASI TIDAK VALID: tanpa ID pasien] KALIBRASI 1-TITIK (AAMI SP10)
+[2026-10-26 02:07:26] ===========================================================================
+[2026-10-26 02:07:26] 
+  🎯 SBP (Terkalibrasi 1-Titik):
+[2026-10-26 02:07:26]      MAE: 7.26 mmHg | ME (Bias): +0.05 ± 11.11 mmHg | RMSE: 11.11 mmHg
+[2026-10-26 02:07:26]      BHS Protocol : ≤5mmHg=51.5% | ≤10mmHg=74.1% | ≤15mmHg=86.5% → Grade C
+[2026-10-26 02:07:26]      AAMI SP10    : ❌ GAGAL (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-26 02:07:26] 
+  🎯 DBP (Terkalibrasi 1-Titik):
+[2026-10-26 02:07:26]      MAE: 3.13 mmHg | ME (Bias): -0.09 ± 5.01 mmHg | RMSE: 5.01 mmHg
+[2026-10-26 02:07:26]      BHS Protocol : ≤5mmHg=80.4% | ≤10mmHg=95.2% | ≤15mmHg=98.3% → Grade A
+[2026-10-26 02:07:26]      AAMI SP10    : ✅ LULUS (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-26 02:07:26] 
+  🎯 MAP (Terkalibrasi 1-Titik):
+[2026-10-26 02:07:26]      MAE: 4.13 mmHg | ME (Bias): -0.08 ± 6.20 mmHg | RMSE: 6.20 mmHg
+[2026-10-26 02:07:26]      BHS Protocol : ≤5mmHg=69.3% | ≤10mmHg=90.4% | ≤15mmHg=97.3% → Grade A
+[2026-10-26 02:07:26]      AAMI SP10    : ✅ LULUS (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-26 02:07:26] ---------------------------------------------------------------------------
+[2026-10-26 02:07:26]   📊 RATA-RATA MAE TERKALIBRASI: 4.84 mmHg
+[2026-10-26 02:07:26] ===========================================================================
+[2026-10-26 02:07:28] 📈 Grafik scatter tersimpan: checkpoints/run_adamw_block/scatter_pred_vs_true.png
+[2026-10-26 02:07:29] 📈 Grafik Bland-Altman tersimpan: checkpoints/run_adamw_block/bland_altman.png
+[2026-10-26 02:07:29] 📄 Riwayat training tersimpan: checkpoints/run_adamw_block/training_history.json
+[2026-10-26 02:07:29] 📄 Ringkasan evaluasi tersimpan: checkpoints/run_adamw_block/evaluation_results.json
+[2026-10-26 02:07:29] 📦 Model final deployment tersimpan: checkpoints/run_adamw_block/final_model_full.pt
+[2026-10-26 02:07:29] ===========================================================================
