@@ -455,6 +455,14 @@ class ShimmerECGBPMainWindow(QMainWindow):
         """Cari checkpoint: env ECG_BP_MODEL, lalu run block-split, lalu best_model lama."""
         candidates = [
             os.environ.get("ECG_BP_MODEL"),
+            "checkpoints_adamw/run_adamw_block_reg/final_model_full.pt",
+            "checkpoints_adamw/run_adamw_block_reg/best_model.pt",
+            "checkpoints_adamw/run_adamw_block/final_model_full.pt",
+            "checkpoints_adamw/run_adamw_block/best_model.pt",
+            "checkpoints_adamw/run_adamw_all/final_model_full.pt",
+            "checkpoints_adamw/run_adamw_all/best_model.pt",
+            "checkpoints/run_adamw_block_reg/final_model_full.pt",
+            "checkpoints/run_adamw_block_reg/best_model.pt",
             "checkpoints/run_adamw_block/final_model_full.pt",
             "checkpoints/run_adamw_block/best_model.pt",
             "checkpoints/best_model.pt",

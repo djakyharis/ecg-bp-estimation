@@ -84,6 +84,8 @@ data/*.npz
 # ==============================================================================
 checkpoints/
 */checkpoints/
+checkpoints_adamw/
+*/checkpoints_adamw/
 logs/
 runs/
 wandb/
