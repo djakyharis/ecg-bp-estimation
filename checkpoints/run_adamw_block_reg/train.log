@@ -1,0 +1,131 @@
+[2026-10-27 15:40:34] ✅ Device Akselerator : CUDA (NVIDIA L40, VRAM: 44.3 GB)
+[2026-10-27 15:40:34] ===========================================================================
+[2026-10-27 15:40:34]   بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ (BISMILLAHIR-RAHMANIR-RAHIM)
+[2026-10-27 15:40:34]   PELATIHAN DEEP LEARNING: MULTI-TASK BiLSTM (ECG -> SBP/DBP/MAP)
+[2026-10-27 15:40:34]   Parameter & Metodologi Sesuai Paper Acuan: Fan et al. (2021, Sensors)
+[2026-10-27 15:40:34] ===========================================================================
+[2026-10-27 15:40:34]   Batch Size         : 128
+[2026-10-27 15:40:34]   Learning Rate      : 0.0003
+[2026-10-27 15:40:34]   Optimizer          : ADAMW (Momentum: 0.9, Weight Decay: 0.01, LSTM Decay: 0.01)
+[2026-10-27 15:40:34]   BiLSTM Patch Size  : 25 (Unrolls 50 timesteps x 25 features)
+[2026-10-27 15:40:34]   Feature Projection : AKTIF (proj_dim=64)
+[2026-10-27 15:40:34]   Gated Feature Fusion: AKTIF (Adaptive Sigmoid Gate)
+[2026-10-27 15:40:34]   Temporal Attention : NON-AKTIF (Terminal States)
+[2026-10-27 15:40:34]   Physiological Loss : AKTIF (lambda_phys=0.1)
+[2026-10-27 15:40:34]   Loss Normalization : NON-AKTIF (Pure Absolute Scale)
+[2026-10-27 15:40:34]   LR Scheduler       : COSINE (Patience=10, Factor=0.8, MinLR=1.0e-05)
+[2026-10-27 15:40:34]   BiLSTM Dropout     : LSTM=0.3, FC Heads=0.3
+[2026-10-27 15:40:34]   Mixed Precision    : AKTIF (FP16 GradScaler)
+[2026-10-27 15:40:34]   DataLoader Workers : 8 (Pin Memory: True)
+[2026-10-27 15:40:34]   Folder Checkpoint  : /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg
+[2026-10-27 15:40:34]   File Log Aktif     : /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg/train.log
+[2026-10-27 15:40:34] ===========================================================================
+[2026-10-27 15:40:34] Memuat 12 berkas dataset preprocessed...
+[2026-10-27 15:40:34]   • part_10_preprocessed.npz (96.8 MB)
+[2026-10-27 15:40:34]   • part_11_preprocessed.npz (99.2 MB)
+[2026-10-27 15:40:34]   • part_12_preprocessed.npz (80.8 MB)
+[2026-10-27 15:40:34]   • part_1_preprocessed.npz (106.0 MB)
+[2026-10-27 15:40:34]   • part_2_preprocessed.npz (92.5 MB)
+[2026-10-27 15:40:34]   • part_3_preprocessed.npz (74.1 MB)
+[2026-10-27 15:40:34]   • part_4_preprocessed.npz (100.4 MB)
+[2026-10-27 15:40:34]   • part_5_preprocessed.npz (106.9 MB)
+[2026-10-27 15:40:34]   • part_6_preprocessed.npz (105.2 MB)
+[2026-10-27 15:40:34]   • part_7_preprocessed.npz (49.9 MB)
+[2026-10-27 15:40:34]   • part_8_preprocessed.npz (79.5 MB)
+[2026-10-27 15:40:34]   • part_9_preprocessed.npz (104.1 MB)
+[2026-10-27 15:40:46] Total sampel terkumpul: 261,117 epoch (10 detik @ 125 Hz)
+[2026-10-27 15:40:46] ⚠️  Split Mode: BLOCK (kontigu, tanpa pengacakan, evaluasi lintas-rekaman)
+[2026-10-27 15:40:46] 📏 Baseline tebak-median (test): SBP 18.37 | DBP 6.66 | MAP 8.91 | rata-rata 11.31 mmHg  <- MAE model harus lebih rendah dari ini
+[2026-10-27 15:40:46] 🔍 Mengekstrak 25 Fitur Statistik (set 'all25', Nour et al. 2022 / Ilham Hakim 2025)...
+[2026-10-27 15:41:23] ✅ Mode Hybrid Aktif: SBP Head (+13 fitur) | DBP Head (+12 fitur) | MAP Head (+25 fitur)
+[2026-10-27 15:41:23] 📊 Pembagian Data: Train=208,893 | Val=26,111 | Test=26,113
+[2026-10-27 15:41:23]    Jumlah Iterasi per Epoch: 1631 batch
+[2026-10-27 15:41:24] ✅ Inisialisasi Model: 3,580,675 parameter terlatih
+[2026-10-27 15:41:33] 
+🚀 Bismillahir-Rahmanir-Rahim, memulai proses pelatihan dari Epoch 1 hingga 30...
+[2026-10-27 15:42:37] Epoch [01/30] (64.0s) | TrLoss: 11.6648 | VlLoss: 12.8339 | Val MAE -> SBP: 20.30, DBP: 8.34, MAP: 11.02 mmHg ★ BEST | θ=[0.33, 0.33, 0.33] | LR=3.0e-04
+[2026-10-27 15:43:38] Epoch [02/30] (60.5s) | TrLoss: 11.0669 | VlLoss: 12.8545 | Val MAE -> SBP: 20.26, DBP: 8.41, MAP: 10.99 mmHg ★ BEST | θ=[0.28, 0.41, 0.30] | LR=3.0e-04
+[2026-10-27 15:44:39] Epoch [03/30] (60.7s) | TrLoss: 10.3575 | VlLoss: 12.4130 | Val MAE -> SBP: 20.54, DBP: 8.71, MAP: 10.93 mmHg  | θ=[0.28, 0.46, 0.25] | LR=2.9e-04
+[2026-10-27 15:45:37] Epoch [04/30] (56.9s) | TrLoss: 10.1460 | VlLoss: 12.6423 | Val MAE -> SBP: 21.31, DBP: 8.81, MAP: 11.14 mmHg  | θ=[0.40, 0.38, 0.22] | LR=2.9e-04
+[2026-10-27 15:46:36] Epoch [05/30] (58.6s) | TrLoss: 10.9152 | VlLoss: 13.9761 | Val MAE -> SBP: 20.72, DBP: 9.22, MAP: 11.22 mmHg  | θ=[0.37, 0.44, 0.19] | LR=2.8e-04
+[2026-10-27 15:47:33] Epoch [06/30] (57.4s) | TrLoss: 10.4595 | VlLoss: 13.2713 | Val MAE -> SBP: 20.37, DBP: 8.86, MAP: 11.30 mmHg  | θ=[0.36, 0.47, 0.18] | LR=2.7e-04
+[2026-10-27 15:48:33] Epoch [07/30] (59.3s) | TrLoss: 10.1623 | VlLoss: 13.3229 | Val MAE -> SBP: 20.94, DBP: 9.05, MAP: 11.11 mmHg  | θ=[0.37, 0.46, 0.17] | LR=2.6e-04
+[2026-10-27 15:49:32] Epoch [08/30] (58.9s) | TrLoss: 10.1291 | VlLoss: 13.3638 | Val MAE -> SBP: 20.76, DBP: 8.96, MAP: 10.81 mmHg  | θ=[0.33, 0.38, 0.29] | LR=2.5e-04
+[2026-10-27 15:50:30] Epoch [09/30] (57.7s) | TrLoss: 9.7484 | VlLoss: 13.0512 | Val MAE -> SBP: 20.39, DBP: 9.17, MAP: 10.93 mmHg  | θ=[0.31, 0.42, 0.26] | LR=2.4e-04
+[2026-10-27 15:51:28] Epoch [10/30] (57.1s) | TrLoss: 9.4468 | VlLoss: 12.8098 | Val MAE -> SBP: 20.22, DBP: 9.17, MAP: 11.00 mmHg  | θ=[0.41, 0.34, 0.25] | LR=2.3e-04
+[2026-10-27 15:52:28] Epoch [11/30] (60.0s) | TrLoss: 10.0012 | VlLoss: 14.3277 | Val MAE -> SBP: 20.90, DBP: 9.24, MAP: 11.35 mmHg  | θ=[0.48, 0.28, 0.24] | LR=2.1e-04
+[2026-10-27 15:53:28] Epoch [12/30] (59.9s) | TrLoss: 10.2741 | VlLoss: 14.9912 | Val MAE -> SBP: 20.69, DBP: 9.09, MAP: 11.39 mmHg  | θ=[0.45, 0.28, 0.26] | LR=2.0e-04
+[2026-10-27 15:54:26] Epoch [13/30] (57.9s) | TrLoss: 9.8760 | VlLoss: 14.7091 | Val MAE -> SBP: 20.84, DBP: 9.01, MAP: 11.28 mmHg  | θ=[0.45, 0.24, 0.32] | LR=1.9e-04
+[2026-10-27 15:55:26] Epoch [14/30] (59.1s) | TrLoss: 9.6433 | VlLoss: 14.9257 | Val MAE -> SBP: 20.87, DBP: 9.17, MAP: 11.66 mmHg  | θ=[0.35, 0.26, 0.39] | LR=1.7e-04
+[2026-10-27 15:56:27] Epoch [15/30] (60.8s) | TrLoss: 8.8540 | VlLoss: 13.9548 | Val MAE -> SBP: 20.79, DBP: 9.17, MAP: 11.52 mmHg  | θ=[0.35, 0.22, 0.43] | LR=1.6e-04
+[2026-10-27 15:57:18] Epoch [16/30] (50.9s) | TrLoss: 8.6390 | VlLoss: 14.4623 | Val MAE -> SBP: 21.77, DBP: 9.22, MAP: 11.70 mmHg  | θ=[0.46, 0.20, 0.34] | LR=1.4e-04
+[2026-10-27 15:58:15] Epoch [17/30] (56.7s) | TrLoss: 9.0250 | VlLoss: 15.3480 | Val MAE -> SBP: 21.14, DBP: 9.16, MAP: 11.71 mmHg  | θ=[0.53, 0.19, 0.28] | LR=1.2e-04
+[2026-10-27 15:59:11] Epoch [18/30] (56.0s) | TrLoss: 9.1808 | VlLoss: 16.0701 | Val MAE -> SBP: 21.33, DBP: 9.12, MAP: 11.58 mmHg  | θ=[0.48, 0.18, 0.34] | LR=1.1e-04
+[2026-10-27 16:00:03] Epoch [19/30] (51.6s) | TrLoss: 8.7201 | VlLoss: 15.8522 | Val MAE -> SBP: 21.59, DBP: 9.23, MAP: 11.79 mmHg  | θ=[0.55, 0.17, 0.29] | LR=9.6e-05
+[2026-10-27 16:00:59] Epoch [20/30] (55.5s) | TrLoss: 8.8510 | VlLoss: 16.5680 | Val MAE -> SBP: 21.72, DBP: 9.24, MAP: 11.79 mmHg  | θ=[0.61, 0.15, 0.24] | LR=8.3e-05
+[2026-10-27 16:01:56] Epoch [21/30] (56.1s) | TrLoss: 8.9724 | VlLoss: 16.7919 | Val MAE -> SBP: 21.25, DBP: 9.14, MAP: 11.52 mmHg  | θ=[0.47, 0.16, 0.37] | LR=7.0e-05
+[2026-10-27 16:02:52] Epoch [22/30] (55.7s) | TrLoss: 8.1622 | VlLoss: 15.7599 | Val MAE -> SBP: 21.68, DBP: 9.19, MAP: 11.81 mmHg  | θ=[0.55, 0.15, 0.30] | LR=5.8e-05
+[2026-10-27 16:03:45] Epoch [23/30] (52.4s) | TrLoss: 8.4236 | VlLoss: 16.6552 | Val MAE -> SBP: 21.75, DBP: 9.28, MAP: 11.82 mmHg  | θ=[0.61, 0.14, 0.25] | LR=4.7e-05
+[2026-10-27 16:04:41] Epoch [24/30] (55.8s) | TrLoss: 8.5603 | VlLoss: 17.3406 | Val MAE -> SBP: 22.00, DBP: 9.21, MAP: 11.74 mmHg  | θ=[0.58, 0.19, 0.23] | LR=3.8e-05
+[2026-10-27 16:05:35] Epoch [25/30] (54.3s) | TrLoss: 8.3358 | VlLoss: 16.8859 | Val MAE -> SBP: 21.86, DBP: 9.21, MAP: 11.80 mmHg  | θ=[0.62, 0.17, 0.20] | LR=2.9e-05
+[2026-10-27 16:06:33] Epoch [26/30] (56.9s) | TrLoss: 8.4367 | VlLoss: 17.4293 | Val MAE -> SBP: 21.99, DBP: 9.24, MAP: 11.78 mmHg  | θ=[0.57, 0.17, 0.26] | LR=2.3e-05
+[2026-10-27 16:07:31] Epoch [27/30] (57.7s) | TrLoss: 8.1539 | VlLoss: 16.9323 | Val MAE -> SBP: 22.00, DBP: 9.25, MAP: 11.82 mmHg  | θ=[0.47, 0.17, 0.37] | LR=1.7e-05
+[2026-10-27 16:08:29] Epoch [28/30] (58.2s) | TrLoss: 7.6468 | VlLoss: 15.8032 | Val MAE -> SBP: 21.78, DBP: 9.29, MAP: 11.85 mmHg  | θ=[0.55, 0.15, 0.29] | LR=1.3e-05
+[2026-10-27 16:09:24] Epoch [29/30] (54.0s) | TrLoss: 7.9920 | VlLoss: 16.7537 | Val MAE -> SBP: 21.86, DBP: 9.27, MAP: 11.83 mmHg  | θ=[0.54, 0.15, 0.31] | LR=1.1e-05
+[2026-10-27 16:10:21] Epoch [30/30] (56.9s) | TrLoss: 7.9046 | VlLoss: 16.6428 | Val MAE -> SBP: 21.89, DBP: 9.27, MAP: 11.84 mmHg  | θ=[0.60, 0.14, 0.26] | LR=1.0e-05
+[2026-10-27 16:10:21] ===========================================================================
+[2026-10-27 16:10:21] 🎉 Pelatihan Selesai dalam 28.8 menit (0.48 jam)!
+[2026-10-27 16:10:21] Model terbaik tersimpan di: /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg/best_model.pt (Best Avg Val MAE: 13.22 mmHg)
+[2026-10-27 16:10:23] 📈 Grafik kurva pelatihan tersimpan: /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg/training_curves.png
+[2026-10-27 16:10:23] 
+Memuat model terbaik untuk evaluasi akhir pada Test Set...
+[2026-10-27 16:10:23] 
+===========================================================================
+[2026-10-27 16:10:23]   EVALUASI AKHIR TEST SET (UNSEEN DATA) — STANDAR BHS & AAMI SP10
+[2026-10-27 16:10:23] ===========================================================================
+[2026-10-27 16:10:26] 
+  🎯 SBP:
+[2026-10-27 16:10:26]      MAE: 17.28 mmHg | ME (Bias): +5.25 ± 20.73 mmHg | RMSE: 21.39 mmHg
+[2026-10-27 16:10:26]      BHS Protocol : ≤5mmHg=18.0% | ≤10mmHg=34.5% | ≤15mmHg=49.3% → Grade D
+[2026-10-27 16:10:26]      AAMI SP10    : ❌ GAGAL (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-27 16:10:26] 
+  🎯 DBP:
+[2026-10-27 16:10:26]      MAE: 7.11 mmHg | ME (Bias): +2.42 ± 8.64 mmHg | RMSE: 8.98 mmHg
+[2026-10-27 16:10:26]      BHS Protocol : ≤5mmHg=43.1% | ≤10mmHg=73.0% | ≤15mmHg=91.1% → Grade C
+[2026-10-27 16:10:26]      AAMI SP10    : ❌ GAGAL (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-27 16:10:26] 
+  🎯 MAP:
+[2026-10-27 16:10:26]      MAE: 9.00 mmHg | ME (Bias): +1.13 ± 11.16 mmHg | RMSE: 11.22 mmHg
+[2026-10-27 16:10:26]      BHS Protocol : ≤5mmHg=33.7% | ≤10mmHg=61.8% | ≤15mmHg=82.0% → Grade D
+[2026-10-27 16:10:26]      AAMI SP10    : ❌ GAGAL (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-27 16:10:26] ---------------------------------------------------------------------------
+[2026-10-27 16:10:26]   📊 RATA-RATA MAE KESELURUHAN: 11.13 mmHg
+[2026-10-27 16:10:26] ===========================================================================
+[2026-10-27 16:10:26] 
+===========================================================================
+[2026-10-27 16:10:26]   [SIMULASI TIDAK VALID: tanpa ID pasien] KALIBRASI 1-TITIK (AAMI SP10)
+[2026-10-27 16:10:26] ===========================================================================
+[2026-10-27 16:10:26] 
+  🎯 SBP (Terkalibrasi 1-Titik):
+[2026-10-27 16:10:26]      MAE: 6.90 mmHg | ME (Bias): -0.00 ± 10.64 mmHg | RMSE: 10.64 mmHg
+[2026-10-27 16:10:26]      BHS Protocol : ≤5mmHg=52.7% | ≤10mmHg=76.4% | ≤15mmHg=88.7% → Grade C
+[2026-10-27 16:10:26]      AAMI SP10    : ❌ GAGAL (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-27 16:10:26] 
+  🎯 DBP (Terkalibrasi 1-Titik):
+[2026-10-27 16:10:26]      MAE: 3.21 mmHg | ME (Bias): -0.07 ± 5.11 mmHg | RMSE: 5.11 mmHg
+[2026-10-27 16:10:26]      BHS Protocol : ≤5mmHg=79.3% | ≤10mmHg=94.9% | ≤15mmHg=98.2% → Grade A
+[2026-10-27 16:10:26]      AAMI SP10    : ✅ LULUS (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-27 16:10:26] 
+  🎯 MAP (Terkalibrasi 1-Titik):
+[2026-10-27 16:10:26]      MAE: 3.96 mmHg | ME (Bias): -0.10 ± 6.03 mmHg | RMSE: 6.03 mmHg
+[2026-10-27 16:10:26]      BHS Protocol : ≤5mmHg=71.2% | ≤10mmHg=91.8% | ≤15mmHg=97.2% → Grade A
+[2026-10-27 16:10:26]      AAMI SP10    : ✅ LULUS (Kriteria: MAE ≤ 5 & STD ≤ 8)
+[2026-10-27 16:10:26] ---------------------------------------------------------------------------
+[2026-10-27 16:10:26]   📊 RATA-RATA MAE TERKALIBRASI: 4.69 mmHg
+[2026-10-27 16:10:26] ===========================================================================
+[2026-10-27 16:10:28] 📈 Grafik scatter tersimpan: /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg/scatter_pred_vs_true.png
+[2026-10-27 16:10:29] 📈 Grafik Bland-Altman tersimpan: /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg/bland_altman.png
+[2026-10-27 16:10:29] 📄 Riwayat training tersimpan: /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg/training_history.json
+[2026-10-27 16:10:29] 📄 Ringkasan evaluasi tersimpan: /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg/evaluation_results.json
+[2026-10-27 16:10:29] 📦 Model final deployment tersimpan: /mnt/nas-hpg9/djakyharis/ecg-bp-clean/checkpoints/run_adamw_block_reg/final_model_full.pt
+[2026-10-27 16:10:29] ===========================================================================
