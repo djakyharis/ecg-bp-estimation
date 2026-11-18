@@ -1,16 +1,15 @@
 """
 Aplikasi Desktop Native macOS: Shimmer3 Real-Time ECG & Blood Pressure Monitor.
-Disesuaikan dengan Protokol Pengujian & Ablation Study (3 Sesi x 3 Metode Kalibrasi):
-  - Metode 1: Tanpa Kalibrasi (Pure Model / Calibration-Free, Offset = 0)
-  - Metode 2: Kalibrasi Statis 120/80 (Population Baseline, Offset terhadap 120/80 mmHg)
-  - Metode 3: Kalibrasi 1-Titik Manset Asli (Proposed Method, Offset terhadap Ground Truth Manset)
+Disesuaikan dengan Protokol Pengujian & Studi Komparasi (3 Sesi x 2 Metode Kalibrasi):
+  - Tanpa Kalibrasi (Pure Model AI / Calibration-Free, Offset = 0)
+  - Dengan Kalibrasi 1-Titik Manset (Proposed Method, Offset terhadap Ground Truth Manset)
 
 Fitur Utama:
 1. Panel Kontrol: Koneksi Real-Time Shimmer3 via Bluetooth (macOS /dev/cu.*).
 2. Protokol Pengujian 3 Sesi (Sesi 1, Sesi 2, Sesi 3) dengan Ground Truth Tensimeter Manset per Sesi.
 3. Osiloskop Real-Time (PyQtGraph): Evaluasi Sinyal ECG Mentah vs Terfilter (RM 1).
-4. Komputasi Simultan 3 Metode Kalibrasi setiap Jendela 10 Detik (RM 2 & RM 4).
-5. Tabel Ringkasan Statistik Ablation Study (MAE, RMSE, ME±STD, Standar AAMI, Grade BHS) & Latensi (RM 3).
+4. Komputasi Simultan Tanpa Kalibrasi vs Dengan Kalibrasi Manset setiap Jendela 10 Detik (RM 2 & RM 4).
+5. Tabel Ringkasan Statistik Komparasi (MAE, RMSE, ME±STD, Standar AAMI, Grade BHS) & Latensi (RM 3).
 6. Penyimpanan Otomatis per Sesi dan Rekapitulasi Lintas Sesi ke CSV/JSON.
 """
 
@@ -616,9 +615,8 @@ class ShimmerECGBPMainWindow(QMainWindow):
 
         self.lbl_offset_info = QLabel(
             "Acuan Awal (t0): Menunggu jendela W1 (10s)\n"
-            "• M1 (Tanpa Kalibrasi): Δ = 0.0 / 0.0 mmHg\n"
-            "• M2 (Statis 120/80): Δ = -- / -- mmHg\n"
-            "• M3 (Manset Asli): Δ = -- / -- mmHg"
+            "• Tanpa Kalibrasi (Pure AI): Δ = 0.0 / 0.0 mmHg\n"
+            "• Dengan Kalibrasi Manset: Δ = -- / -- mmHg"
         )
         self.lbl_offset_info.setStyleSheet(
             "background-color: #F8FAFC; color: #334155; border: 1px solid #E2E8F0; "
@@ -750,31 +748,22 @@ class ShimmerECGBPMainWindow(QMainWindow):
         plot_layout.addWidget(self.plot_widget)
         right_layout.addWidget(plot_group, 3)
 
-        # 6. KARTU KOMPARASI 3 METODE KALIBRASI SECARA REAL-TIME
+        # 6. KARTU KOMPARASI REAL-TIME: TANPA KALIBRASI VS DENGAN KALIBRASI MANSET
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(12)
 
-        # Kartu Metode 1: Tanpa Kalibrasi (Pure Model)
+        # Kartu 1: Tanpa Kalibrasi (Pure Model)
         self.card_m1 = self._create_method_card(
-            title="METODE 1: TANPA KALIBRASI (PURE AI)",
+            title="TANPA KALIBRASI (PURE MODEL AI)",
             subtitle="Offset Δ: 0.0 / 0.0 mmHg",
             val_color="#DC2626",
             is_proposed=False
         )
         cards_layout.addWidget(self.card_m1["frame"])
 
-        # Kartu Metode 2: Kalibrasi Statis 120/80 (Populasi)
-        self.card_m2 = self._create_method_card(
-            title="METODE 2: KALIBRASI STATIS 120/80",
-            subtitle="Offset thd Patokan 120/80 mmHg",
-            val_color="#D97706",
-            is_proposed=False
-        )
-        cards_layout.addWidget(self.card_m2["frame"])
-
-        # Kartu Metode 3: Kalibrasi 1-Titik Manset Asli (Proposed Method)
+        # Kartu 2: Dengan Kalibrasi 1-Titik Manset (Proposed Method)
         self.card_m3 = self._create_method_card(
-            title="METODE 3: MANSET ASLI 1-TITIK (USULAN)",
+            title="DENGAN KALIBRASI 1-TITIK MANSET (USULAN)",
             subtitle="Offset thd Ground Truth Manset Sesi",
             val_color="#15803D",
             is_proposed=True
@@ -783,8 +772,8 @@ class ShimmerECGBPMainWindow(QMainWindow):
 
         right_layout.addLayout(cards_layout, 1)
 
-        # 7. PANEL ANALISIS ABLATION STUDY (TABEL RINGKASAN 3 METODE + TABEL HISTORI JENDELA)
-        eval_group = QGroupBox("6. ANALISIS ABLATION STUDY 3 METODE KALIBRASI & EVALUASI BAB 4 (RM 2, RM 3, RM 4)")
+        # 7. PANEL ANALISIS KOMPARASI (TABEL RINGKASAN TANPA VS DENGAN KALIBRASI + TABEL HISTORI JENDELA)
+        eval_group = QGroupBox("6. ANALISIS KOMPARASI TANPA VS DENGAN KALIBRASI & EVALUASI BAB 4 (RM 2, RM 3, RM 4)")
         eval_layout = QVBoxLayout(eval_group)
         eval_layout.setSpacing(8)
 
@@ -808,44 +797,43 @@ class ShimmerECGBPMainWindow(QMainWindow):
         self.btn_clear_history.clicked.connect(self._clear_all_history)
         filter_bar.addWidget(self.btn_clear_history)
 
-        self.btn_export_csv = QPushButton("Ekspor CSV & JSON Ablation Study")
+        self.btn_export_csv = QPushButton("Ekspor CSV & JSON Evaluasi")
         self.btn_export_csv.clicked.connect(self._export_csv)
         filter_bar.addWidget(self.btn_export_csv)
 
         eval_layout.addLayout(filter_bar)
 
-        # Tabel 6A: Ringkasan Komparasi Statistik 3 Metode Kalibrasi (Selalu 3 Baris, Sangat Mudah Dibaca)
-        lbl_tbl_sum = QLabel("A. Tabel Ringkasan Statistik Ablation Study (Komparasi Langsung 3 Metode terhadap Ground Truth Manset):")
+        # Tabel 6A: Ringkasan Komparasi Statistik Tanpa vs Dengan Kalibrasi (2 Baris Tetap, Sangat Mudah Dibaca)
+        lbl_tbl_sum = QLabel("A. Tabel Ringkasan Statistik Evaluasi (Tanpa Kalibrasi vs Dengan Kalibrasi Manset terhadap Ground Truth):")
         lbl_tbl_sum.setStyleSheet("font-weight: 700; color: #0F172A; font-size: 11px;")
         eval_layout.addWidget(lbl_tbl_sum)
 
-        self.summary_table = QTableWidget(3, 11)
+        self.summary_table = QTableWidget(2, 11)
         self.summary_table.setHorizontalHeaderLabels([
-            "Metode Kalibrasi", "N Jendela", "GT Manset (S/D)", "Mean Prediksi (S/D)",
+            "Metode Estimasi", "N Jendela", "GT Manset (S/D)", "Mean Prediksi (S/D)",
             "MAE SBP", "MAE DBP", "RMSE (S/D)", "ME ± STD SBP", "ME ± STD DBP",
             "Standar AAMI (≤5/≤8)", "Grade BHS (S/D)"
         ])
         self.summary_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.summary_table.verticalHeader().setVisible(False)
         self.summary_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.summary_table.setFixedHeight(118)
+        self.summary_table.setFixedHeight(92)
         self.summary_table.setStyleSheet(
             "QTableWidget { background-color: #FFFFFF; gridline-color: #CBD5E1; font-size: 11px; }"
             "QHeaderView::section { background-color: #F1F5F9; color: #1E293B; font-weight: 700; padding: 4px; border: none; border-bottom: 1px solid #CBD5E1; }"
         )
         eval_layout.addWidget(self.summary_table)
 
-        # Tabel 6B: Histori Detail per Jendela 10 Detik (Menampilkan M1, M2, M3 berdampingan tanpa BPM)
-        lbl_tbl_hist = QLabel("B. Tabel Histori Estimasi per Jendela 10 Detik (Perbandingan M1 vs M2 vs M3):")
+        # Tabel 6B: Histori Detail per Jendela 10 Detik (Menampilkan Tanpa vs Dengan Kalibrasi berdampingan tanpa BPM)
+        lbl_tbl_hist = QLabel("B. Tabel Histori Estimasi per Jendela 10 Detik (Perbandingan Tanpa Kalibrasi vs Dengan Kalibrasi Manset):")
         lbl_tbl_hist.setStyleSheet("font-weight: 700; color: #0F172A; font-size: 11px;")
         eval_layout.addWidget(lbl_tbl_hist)
 
-        self.history_table = QTableWidget(0, 10)
+        self.history_table = QTableWidget(0, 8)
         self.history_table.setHorizontalHeaderLabels([
             "Jendela", "Sesi", "GT Manset",
-            "M1: Tanpa Kal", "|Err| M1 (S/D)",
-            "M2: Statis 120/80", "|Err| M2 (S/D)",
-            "M3: Manset Asli", "|Err| M3 (S/D)",
+            "Tanpa Kalibrasi (S/D)", "|Err| Tanpa Kal (S/D)",
+            "Dengan Kalibrasi (S/D)", "|Err| Dengan Kal (S/D)",
             "Latensi (ms)"
         ])
         self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -860,7 +848,7 @@ class ShimmerECGBPMainWindow(QMainWindow):
         main_layout.addWidget(right_panel, 1)
 
         self._init_empty_summary_table()
-        self._log("Aplikasi siap. Protokol 3 Sesi x 3 Metode Kalibrasi aktif (tanpa analisis BPM).")
+        self._log("Aplikasi siap. Protokol 3 Sesi (Tanpa vs Dengan Kalibrasi Manset) aktif.")
         self._log(f"Model Prediktor BiLSTM: {'Dimuat dari ' + self.model_name if self.predictor else 'TIDAK ditemukan'}")
 
     def _create_method_card(self, title: str, subtitle: str, val_color: str, is_proposed: bool) -> Dict[str, Any]:
@@ -907,9 +895,8 @@ class ShimmerECGBPMainWindow(QMainWindow):
 
     def _init_empty_summary_table(self):
         method_names = [
-            "1. Tanpa Kalibrasi (Pure Model)",
-            "2. Kalibrasi Statis 120/80 (Populasi)",
-            "3. Kalibrasi 1-Titik Manset Asli (Usulan)",
+            "1. Tanpa Kalibrasi (Pure Model AI)",
+            "2. Dengan Kalibrasi 1-Titik Manset (Usulan)",
         ]
         for r, name in enumerate(method_names):
             vals = [name, "0", "-", "-", "-", "-", "-", "-", "-", "-", "-"]
@@ -919,7 +906,7 @@ class ShimmerECGBPMainWindow(QMainWindow):
                     font = item.font()
                     font.setBold(True)
                     item.setFont(font)
-                if r == 2:
+                if r == 1:
                     item.setBackground(QtGui.QColor("#F0FDF4"))
                 self.summary_table.setItem(r, c, item)
 
@@ -1225,10 +1212,9 @@ class ShimmerECGBPMainWindow(QMainWindow):
         return [
             "patient_id", "session", "window_no", "t_end_s", "timestamp",
             "gt_SBP", "gt_DBP",
-            "m1_SBP_uncal", "m1_DBP_uncal", "m1_MAP_uncal", "m1_abs_err_SBP", "m1_abs_err_DBP",
-            "m2_SBP_stat120", "m2_DBP_stat80", "m2_MAP_stat", "m2_abs_err_SBP", "m2_abs_err_DBP",
-            "m3_SBP_cuff", "m3_DBP_cuff", "m3_MAP_cuff", "m3_abs_err_SBP", "m3_abs_err_DBP",
-            "category_aha_m3", "latency_ms",
+            "uncal_SBP", "uncal_DBP", "uncal_MAP", "uncal_abs_err_SBP", "uncal_abs_err_DBP",
+            "cal_SBP", "cal_DBP", "cal_MAP", "cal_abs_err_SBP", "cal_abs_err_DBP",
+            "category_aha", "latency_ms",
             # Kolom kompatibilitas mundur dengan skrip plot Bab 4
             "calibration_status", "SBP", "DBP", "MAP", "SBP_raw", "DBP_raw", "MAP_raw",
             "ref_SBP", "ref_DBP", "abs_err_SBP", "abs_err_DBP"
@@ -1240,7 +1226,6 @@ class ShimmerECGBPMainWindow(QMainWindow):
             rec["patient_id"], rec["session"], rec["window_no"], f"{rec['t_end_s']:.1f}", rec["timestamp"],
             rec["gt_sbp"], rec["gt_dbp"],
             rec["m1_sbp"], rec["m1_dbp"], rec["m1_map"], rec["m1_err_sbp"], rec["m1_err_dbp"],
-            rec["m2_sbp"], rec["m2_dbp"], rec["m2_map"], rec["m2_err_sbp"], rec["m2_err_dbp"],
             rec["m3_sbp"], rec["m3_dbp"], rec["m3_map"], rec["m3_err_sbp"], rec["m3_err_dbp"],
             rec["cat_m3"], rec["latency_ms"],
             "TERKALIBRASI", rec["m3_sbp"], rec["m3_dbp"], rec["m3_map"],
@@ -1295,23 +1280,20 @@ class ShimmerECGBPMainWindow(QMainWindow):
             self.lbl_offset_info.setText(
                 f"Ground Truth Manset Sesi: {gt_s:.0f} / {gt_d:.0f} mmHg\n"
                 "Acuan Awal AI (t0): Menunggu jendela W1 (10s)\n"
-                "• M1 (Tanpa Kalibrasi): Δ = 0.0 / 0.0 mmHg\n"
-                "• M2 (Statis 120/80): Δ = -- / -- mmHg\n"
-                "• M3 (Manset Asli): Δ = -- / -- mmHg"
+                "• Tanpa Kalibrasi (Pure AI): Δ = 0.0 / 0.0 mmHg\n"
+                "• Dengan Kalibrasi Manset: Δ = -- / -- mmHg"
             )
             return
         s0, d0 = float(self.baseline_raw_t0[0]), float(self.baseline_raw_t0[1])
-        off2_s, off2_d = 120.0 - s0, 80.0 - d0
         off3_s, off3_d = gt_s - s0, gt_d - d0
         self.lbl_offset_info.setText(
             f"Ground Truth Manset: {gt_s:.0f}/{gt_d:.0f} mmHg | AI Awal (t0): {s0:.1f}/{d0:.1f} mmHg\n"
-            f"• M1 (Tanpa Kalibrasi): Δ = 0.0 / 0.0 mmHg\n"
-            f"• M2 (Statis 120/80): Δ = {off2_s:+.1f} / {off2_d:+.1f} mmHg\n"
-            f"• M3 (Manset Asli): Δ = {off3_s:+.1f} / {off3_d:+.1f} mmHg"
+            f"• Tanpa Kalibrasi (Pure AI): Δ = 0.0 / 0.0 mmHg\n"
+            f"• Dengan Kalibrasi Manset: Δ = {off3_s:+.1f} / {off3_d:+.1f} mmHg"
         )
 
     def _recalculate_session_with_current_gt(self):
-        """Jika pengguna mengubah nilai GT Manset, hitung ulang M3 dan galat untuk sesi saat ini."""
+        """Jika pengguna mengubah nilai GT Manset, hitung ulang hasil kalibrasi dan galat untuk sesi saat ini."""
         gt_s = round(float(self.spin_ref_sbp.value()), 1)
         gt_d = round(float(self.spin_ref_dbp.value()), 1)
         target_sess = self.rec_session_label if self.session_active else self.combo_session.currentText()
@@ -1325,16 +1307,11 @@ class ShimmerECGBPMainWindow(QMainWindow):
         s0 = float(sess_records[0]["m1_sbp"])
         d0 = float(sess_records[0]["m1_dbp"])
         self.baseline_raw_t0 = np.array([s0, d0], dtype=float)
-        off2_s, off2_d = 120.0 - s0, 80.0 - d0
         off3_s, off3_d = gt_s - s0, gt_d - d0
 
         for rec in sess_records:
             raw_s = float(rec["m1_sbp"])
             raw_d = float(rec["m1_dbp"])
-
-            m2_s = round(raw_s + off2_s, 1)
-            m2_d = round(raw_d + off2_d, 1)
-            m2_m = round(m2_d + (m2_s - m2_d) / 3.0, 1)
 
             m3_s = round(raw_s + off3_s, 1)
             m3_d = round(raw_d + off3_d, 1)
@@ -1344,11 +1321,6 @@ class ShimmerECGBPMainWindow(QMainWindow):
             rec["gt_dbp"] = gt_d
             rec["m1_err_sbp"] = round(abs(raw_s - gt_s), 2)
             rec["m1_err_dbp"] = round(abs(raw_d - gt_d), 2)
-            rec["m2_sbp"] = m2_s
-            rec["m2_dbp"] = m2_d
-            rec["m2_map"] = m2_m
-            rec["m2_err_sbp"] = round(abs(m2_s - gt_s), 2)
-            rec["m2_err_dbp"] = round(abs(m2_d - gt_d), 2)
             rec["m3_sbp"] = m3_s
             rec["m3_dbp"] = m3_d
             rec["m3_map"] = m3_m
@@ -1357,7 +1329,6 @@ class ShimmerECGBPMainWindow(QMainWindow):
             rec["cat_m3"] = classify_blood_pressure_aha(m3_s, m3_d)["category"]
             updated_count += 1
 
-        # Tulis ulang file CSV prediksi sesi aktif jika sedang terbuka
         if self.session_active and self.rec_pred_file is not None:
             try:
                 self.rec_pred_file.seek(0)
@@ -1371,7 +1342,7 @@ class ShimmerECGBPMainWindow(QMainWindow):
 
         self._update_offset_info_label()
         if sess_records:
-            self._update_3_cards(sess_records[-1])
+            self._update_cards(sess_records[-1])
         self._refresh_tables_and_summary()
         self._log(f"Ground Truth {target_sess} diperbarui ke {gt_s:.0f}/{gt_d:.0f} mmHg ({updated_count} jendela dihitung ulang).")
 
@@ -1388,7 +1359,7 @@ class ShimmerECGBPMainWindow(QMainWindow):
         self._log("Histori tabel analisis telah direset.")
 
     # -------------------------------------------------------------------
-    # Evaluasi Statistik Bab 4 untuk Ketiga Metode Sekaligus (Ablation Study)
+    # Evaluasi Statistik Bab 4: Tanpa Kalibrasi vs Dengan Kalibrasi Manset
     # -------------------------------------------------------------------
     @staticmethod
     def _grade_bhs(pct_le5: float, pct_le10: float, pct_le15: float) -> str:
@@ -1467,21 +1438,16 @@ class ShimmerECGBPMainWindow(QMainWindow):
         if not target:
             return {}
         m1 = self._compute_method_stats(target, "m1")
-        m2 = self._compute_method_stats(target, "m2")
         m3 = self._compute_method_stats(target, "m3")
         lats = [float(r["latency_ms"]) for r in target if float(r["latency_ms"]) > 0]
         fps_vals = list(self.fps_history) if self.fps_history else ([self.current_fps] if self.current_fps > 0 else [])
 
         return {
             "n_windows": len(target),
-            "method_1_uncalibrated": m1,
-            "method_2_static_120_80": m2,
-            "method_3_cuff_1point": m3,
-            # Kompatibilitas skrip plot Bab 4
-            "active_mode": "TERKALIBRASI",
-            "active": m3,
             "uncalibrated": m1,
             "calibrated": m3,
+            "active_mode": "TERKALIBRASI",
+            "active": m3,
             "rm3_performance": {
                 "avg_latency_ms": round(float(np.mean(lats)), 2) if lats else None,
                 "max_latency_ms": round(float(np.max(lats)), 2) if lats else None,
@@ -1501,7 +1467,7 @@ class ShimmerECGBPMainWindow(QMainWindow):
     def _refresh_tables_and_summary(self):
         filtered = self._get_filtered_records()
 
-        # 1. Update Tabel 6A (Ringkasan Statistik 3 Metode)
+        # 1. Update Tabel 6A (Ringkasan Statistik Tanpa vs Dengan Kalibrasi)
         if not filtered:
             self._init_empty_summary_table()
         else:
@@ -1516,9 +1482,8 @@ class ShimmerECGBPMainWindow(QMainWindow):
             )
 
             method_specs = [
-                ("1. Tanpa Kalibrasi (Pure Model)", stats.get("method_1_uncalibrated")),
-                ("2. Kalibrasi Statis 120/80 (Populasi)", stats.get("method_2_static_120_80")),
-                ("3. Kalibrasi 1-Titik Manset Asli (Usulan)", stats.get("method_3_cuff_1point")),
+                ("1. Tanpa Kalibrasi (Pure Model AI)", stats.get("uncalibrated")),
+                ("2. Dengan Kalibrasi 1-Titik Manset (Usulan)", stats.get("calibrated")),
             ]
             for r_idx, (m_name, m_stat) in enumerate(method_specs):
                 if not m_stat:
@@ -1566,56 +1531,41 @@ class ShimmerECGBPMainWindow(QMainWindow):
                 f"{rec['gt_sbp']:.0f} / {rec['gt_dbp']:.0f}",
                 f"{rec['m1_sbp']:.1f} / {rec['m1_dbp']:.1f}",
                 f"{rec['m1_err_sbp']:.2f} / {rec['m1_err_dbp']:.2f}",
-                f"{rec['m2_sbp']:.1f} / {rec['m2_dbp']:.1f}",
-                f"{rec['m2_err_sbp']:.2f} / {rec['m2_err_dbp']:.2f}",
                 f"{rec['m3_sbp']:.1f} / {rec['m3_dbp']:.1f}",
                 f"{rec['m3_err_sbp']:.2f} / {rec['m3_err_dbp']:.2f}",
                 f"{rec['latency_ms']:.2f}",
             ]
             for c, val in enumerate(cols):
                 item = QTableWidgetItem(str(val))
-                if c in (7, 8):
+                if c in (5, 6):
                     item.setBackground(QtGui.QColor("#F0FDF4"))
                     f = item.font()
                     f.setBold(True)
                     item.setFont(f)
                 elif c in (3, 4):
                     item.setBackground(QtGui.QColor("#FEF2F2"))
-                elif c in (5, 6):
-                    item.setBackground(QtGui.QColor("#FFFBEB"))
                 item.setForeground(QtGui.QColor("#0F172A"))
                 self.history_table.setItem(r, c, item)
         self.history_table.scrollToBottom()
 
-    def _update_3_cards(self, rec: Dict[str, Any]):
+    def _update_cards(self, rec: Dict[str, Any]):
         s0, d0 = (self.baseline_raw_t0[0], self.baseline_raw_t0[1]) if self.baseline_raw_t0 is not None else (rec["m1_sbp"], rec["m1_dbp"])
-        off2_s, off2_d = 120.0 - s0, 80.0 - d0
         off3_s, off3_d = rec["gt_sbp"] - s0, rec["gt_dbp"] - d0
 
-        # Kartu 1 (M1)
+        # Kartu 1 (Tanpa Kalibrasi)
         self.card_m1["val"].setText(f"{rec['m1_sbp']:.1f} / {rec['m1_dbp']:.1f}")
         self.card_m1["unit_map"].setText(f"mmHg (MAP: {rec['m1_map']:.1f})")
-        self.card_m1["sub"].setText(f"Offset Δ: 0.0/0.0 | |Err| vs GT: {rec['m1_err_sbp']:.1f} / {rec['m1_err_dbp']:.1f} mmHg")
+        self.card_m1["sub"].setText(f"Offset Δ: 0.0 / 0.0 | |Err| vs GT: {rec['m1_err_sbp']:.1f} / {rec['m1_err_dbp']:.1f} mmHg")
         c1 = classify_blood_pressure_aha(rec["m1_sbp"], rec["m1_dbp"])
         self.card_m1["badge"].setText(c1["category"].upper())
         self.card_m1["badge"].setStyleSheet(
             f"background-color: {c1.get('color', '#64748B')}; color: #FFFFFF; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 10px;"
         )
 
-        # Kartu 2 (M2)
-        self.card_m2["val"].setText(f"{rec['m2_sbp']:.1f} / {rec['m2_dbp']:.1f}")
-        self.card_m2["unit_map"].setText(f"mmHg (MAP: {rec['m2_map']:.1f})")
-        self.card_m2["sub"].setText(f"Offset Δ: {off2_s:+.1f}/{off2_d:+.1f} | |Err| vs GT: {rec['m2_err_sbp']:.1f} / {rec['m2_err_dbp']:.1f} mmHg")
-        c2 = classify_blood_pressure_aha(rec["m2_sbp"], rec["m2_dbp"])
-        self.card_m2["badge"].setText(c2["category"].upper())
-        self.card_m2["badge"].setStyleSheet(
-            f"background-color: {c2.get('color', '#64748B')}; color: #FFFFFF; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 10px;"
-        )
-
-        # Kartu 3 (M3)
+        # Kartu 2 (Dengan Kalibrasi 1-Titik Manset)
         self.card_m3["val"].setText(f"{rec['m3_sbp']:.1f} / {rec['m3_dbp']:.1f}")
         self.card_m3["unit_map"].setText(f"mmHg (MAP: {rec['m3_map']:.1f})")
-        self.card_m3["sub"].setText(f"Offset Δ: {off3_s:+.1f}/{off3_d:+.1f} | |Err| vs GT: {rec['m3_err_sbp']:.1f} / {rec['m3_err_dbp']:.1f} mmHg")
+        self.card_m3["sub"].setText(f"Offset Δ: {off3_s:+.1f} / {off3_d:+.1f} | |Err| vs GT: {rec['m3_err_sbp']:.1f} / {rec['m3_err_dbp']:.1f} mmHg")
         c3 = classify_blood_pressure_aha(rec["m3_sbp"], rec["m3_dbp"])
         self.card_m3["badge"].setText(f"{c3['category'].upper()} (GT: {rec['gt_sbp']:.0f}/{rec['gt_dbp']:.0f})")
         self.card_m3["badge"].setStyleSheet(
@@ -1666,9 +1616,8 @@ class ShimmerECGBPMainWindow(QMainWindow):
             "ground_truth_cuff_sbp_dbp": [gt_s, gt_d],
             "baseline_raw_t0_sbp_dbp": [round(s0, 2), round(d0, 2)],
             "offsets": {
-                "method_1_uncalibrated": [0.0, 0.0],
-                "method_2_static_120_80": [round(120.0 - s0, 2), round(80.0 - d0, 2)],
-                "method_3_cuff_1point": [round(gt_s - s0, 2), round(gt_d - d0, 2)],
+                "uncalibrated": [0.0, 0.0],
+                "calibrated_1point": [round(gt_s - s0, 2), round(gt_d - d0, 2)],
             },
             "bab4_evaluation": bab4_stats,
             "files": {
@@ -1683,7 +1632,6 @@ class ShimmerECGBPMainWindow(QMainWindow):
         except Exception as e:
             self._log(f"Gagal menulis metadata: {e}")
 
-        # Simpan rekap 3 metode ke recordings/rekap_ablation_3metode_bab4.csv dan rekap_tabel_bab4.csv
         self._append_session_to_rekap_csv(end_dt, meta, bab4_stats)
 
         self._set_session_ui()
@@ -1692,9 +1640,8 @@ class ShimmerECGBPMainWindow(QMainWindow):
             "Istirahat 1-2 menit sebelum sesi berikutnya."
         )
         self.lbl_rec_status.setStyleSheet("color: #047857; font-size: 11px; font-weight: 700;")
-        self._log(f"Data {self.rec_session_label} & Ablation Study 3 metode tersimpan di {self.rec_dir}")
+        self._log(f"Data {self.rec_session_label} (Tanpa vs Dengan Kalibrasi) tersimpan di {self.rec_dir}")
 
-        # Otomatis majukan pilihan sesi (Sesi 1 -> Sesi 2 -> Sesi 3) untuk memudahkan pengambilan berikutnya
         cur_idx = self.combo_session.currentIndex()
         if cur_idx < 2:
             self.combo_session.setCurrentIndex(cur_idx + 1)
@@ -1702,53 +1649,10 @@ class ShimmerECGBPMainWindow(QMainWindow):
     def _append_session_to_rekap_csv(self, end_dt: datetime, meta: Dict[str, Any], bab4_stats: Dict[str, Any]):
         try:
             os.makedirs(RECORDINGS_DIR, exist_ok=True)
-            m1 = bab4_stats.get("method_1_uncalibrated") or {}
-            m2 = bab4_stats.get("method_2_static_120_80") or {}
-            m3 = bab4_stats.get("method_3_cuff_1point") or {}
+            m1 = bab4_stats.get("uncalibrated") or {}
+            m3 = bab4_stats.get("calibrated") or {}
             rm3 = bab4_stats.get("rm3_performance") or {}
 
-            # 1. File Rekap Ablation Study 3 Metode
-            ablation_path = os.path.join(RECORDINGS_DIR, "rekap_ablation_3metode_bab4.csv")
-            write_hdr_ab = not os.path.exists(ablation_path)
-            with open(ablation_path, "a", newline="", encoding="utf-8") as af:
-                aw = csv.writer(af)
-                if write_hdr_ab:
-                    aw.writerow([
-                        "timestamp", "patient_id", "session", "duration_s", "n_windows",
-                        "gt_SBP", "gt_DBP",
-                        "m1_SBP_mean", "m1_DBP_mean", "m1_MAE_SBP", "m1_MAE_DBP", "m1_AAMI_SBP", "m1_AAMI_DBP", "m1_BHS_SBP", "m1_BHS_DBP",
-                        "m2_SBP_mean", "m2_DBP_mean", "m2_MAE_SBP", "m2_MAE_DBP", "m2_AAMI_SBP", "m2_AAMI_DBP", "m2_BHS_SBP", "m2_BHS_DBP",
-                        "m3_SBP_mean", "m3_DBP_mean", "m3_MAE_SBP", "m3_MAE_DBP", "m3_AAMI_SBP", "m3_AAMI_DBP", "m3_BHS_SBP", "m3_BHS_DBP",
-                        "avg_latency_ms", "avg_fps"
-                    ])
-                aw.writerow([
-                    end_dt.strftime("%Y-%m-%d %H:%M:%S"),
-                    self.rec_patient_id,
-                    self.rec_session_label,
-                    meta["duration_s"],
-                    self.rec_n_preds,
-                    round(float(self.spin_ref_sbp.value()), 1),
-                    round(float(self.spin_ref_dbp.value()), 1),
-                    m1.get("sbp", {}).get("mean_pred", ""), m1.get("dbp", {}).get("mean_pred", ""),
-                    m1.get("sbp", {}).get("mae", ""), m1.get("dbp", {}).get("mae", ""),
-                    "LULUS" if m1.get("sbp", {}).get("aami_pass") else "TIDAK",
-                    "LULUS" if m1.get("dbp", {}).get("aami_pass") else "TIDAK",
-                    m1.get("sbp", {}).get("bhs_grade", ""), m1.get("dbp", {}).get("bhs_grade", ""),
-                    m2.get("sbp", {}).get("mean_pred", ""), m2.get("dbp", {}).get("mean_pred", ""),
-                    m2.get("sbp", {}).get("mae", ""), m2.get("dbp", {}).get("mae", ""),
-                    "LULUS" if m2.get("sbp", {}).get("aami_pass") else "TIDAK",
-                    "LULUS" if m2.get("dbp", {}).get("aami_pass") else "TIDAK",
-                    m2.get("sbp", {}).get("bhs_grade", ""), m2.get("dbp", {}).get("bhs_grade", ""),
-                    m3.get("sbp", {}).get("mean_pred", ""), m3.get("dbp", {}).get("mean_pred", ""),
-                    m3.get("sbp", {}).get("mae", ""), m3.get("dbp", {}).get("mae", ""),
-                    "LULUS" if m3.get("sbp", {}).get("aami_pass") else "TIDAK",
-                    "LULUS" if m3.get("dbp", {}).get("aami_pass") else "TIDAK",
-                    m3.get("sbp", {}).get("bhs_grade", ""), m3.get("dbp", {}).get("bhs_grade", ""),
-                    rm3.get("avg_latency_ms", ""),
-                    rm3.get("avg_fps", ""),
-                ])
-
-            # 2. File Kompatibilitas rekap_tabel_bab4.csv
             rekap_path = os.path.join(RECORDINGS_DIR, "rekap_tabel_bab4.csv")
             write_header = not os.path.exists(rekap_path)
             with open(rekap_path, "a", newline="", encoding="utf-8") as rf:
@@ -1803,7 +1707,7 @@ class ShimmerECGBPMainWindow(QMainWindow):
         if not self.window_records:
             QMessageBox.information(self, "Ekspor CSV", "Belum ada data estimasi untuk diekspor.")
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Simpan CSV Ablation Study", "ablation_3metode_history.csv", "CSV Files (*.csv)")
+        path, _ = QFileDialog.getSaveFileName(self, "Simpan CSV Komparasi Kalibrasi", "komparasi_kalibrasi_history.csv", "CSV Files (*.csv)")
         if not path:
             return
         try:
@@ -1812,10 +1716,10 @@ class ShimmerECGBPMainWindow(QMainWindow):
                 writer.writerow(self._prediction_csv_headers())
                 for rec in self.window_records:
                     writer.writerow(self._record_to_csv_row(rec))
-            summary_path = os.path.splitext(path)[0] + "_bab4_ablation_summary.json"
+            summary_path = os.path.splitext(path)[0] + "_bab4_summary.json"
             with open(summary_path, "w", encoding="utf-8") as sf:
                 json.dump(self._compute_bab4_metrics(), sf, indent=2, ensure_ascii=False)
-            self._log(f"Data Ablation Study 3 metode diekspor ke {path}")
+            self._log(f"Data komparasi Tanpa vs Dengan Kalibrasi diekspor ke {path}")
             QMessageBox.information(self, "Ekspor Berhasil", f"Tersimpan di:\n{path}\n{summary_path}")
         except Exception as e:
             QMessageBox.warning(self, "Ekspor Gagal", f"Gagal menyimpan: {e}")
@@ -1869,7 +1773,7 @@ class ShimmerECGBPMainWindow(QMainWindow):
             self._run_blood_pressure_inference(epoch_10s, self.rec_win_no, t_end)
 
     # -------------------------------------------------------------------
-    # Render Loop Osiloskop (RM 1) & Inferensi 3 Metode Kalibrasi (RM 2-4)
+    # Render Loop Osiloskop (RM 1) & Inferensi Tanpa vs Dengan Kalibrasi (RM 2-4)
     # -------------------------------------------------------------------
     def _update_plot_and_metrics(self):
         now_t = time.perf_counter()
@@ -1926,7 +1830,7 @@ class ShimmerECGBPMainWindow(QMainWindow):
             self.plot_widget.setYRange(y_min, y_max, padding=0.0)
 
     def _run_blood_pressure_inference(self, epoch_10s: np.ndarray, win_no: int = 0, t_end_s: float = 0.0):
-        """Menjalankan inferensi model AI dan menghitung 3 metode kalibrasi sekaligus."""
+        """Menjalankan inferensi model AI dan menghitung Tanpa Kalibrasi vs Dengan Kalibrasi Manset."""
         try:
             if not self.predictor:
                 self._log("Model BiLSTM tidak dimuat; estimasi BP dilewati.")
@@ -1954,23 +1858,14 @@ class ShimmerECGBPMainWindow(QMainWindow):
             gt_sbp = round(float(self.spin_ref_sbp.value()), 1)
             gt_dbp = round(float(self.spin_ref_dbp.value()), 1)
 
-            # 1. Metode 1: Tanpa Kalibrasi (Pure Model, Offset = 0)
+            # 1. Tanpa Kalibrasi (Pure Model, Offset = 0)
             m1_sbp = raw_sbp
             m1_dbp = raw_dbp
             m1_map = raw_map
             m1_err_sbp = round(abs(m1_sbp - gt_sbp), 2)
             m1_err_dbp = round(abs(m1_dbp - gt_dbp), 2)
 
-            # 2. Metode 2: Kalibrasi Statis 120/80 (Population Baseline)
-            off2_sbp = 120.0 - s0
-            off2_dbp = 80.0 - d0
-            m2_sbp = round(raw_sbp + off2_sbp, 1)
-            m2_dbp = round(raw_dbp + off2_dbp, 1)
-            m2_map = round(m2_dbp + (m2_sbp - m2_dbp) / 3.0, 1)
-            m2_err_sbp = round(abs(m2_sbp - gt_sbp), 2)
-            m2_err_dbp = round(abs(m2_dbp - gt_dbp), 2)
-
-            # 3. Metode 3: Kalibrasi 1-Titik Manset Asli (Proposed Method)
+            # 2. Dengan Kalibrasi 1-Titik Manset Asli (Proposed Method)
             off3_sbp = gt_sbp - s0
             off3_dbp = gt_dbp - d0
             m3_sbp = round(raw_sbp + off3_sbp, 1)
@@ -1991,8 +1886,6 @@ class ShimmerECGBPMainWindow(QMainWindow):
                 "gt_dbp": gt_dbp,
                 "m1_sbp": m1_sbp, "m1_dbp": m1_dbp, "m1_map": m1_map,
                 "m1_err_sbp": m1_err_sbp, "m1_err_dbp": m1_err_dbp,
-                "m2_sbp": m2_sbp, "m2_dbp": m2_dbp, "m2_map": m2_map,
-                "m2_err_sbp": m2_err_sbp, "m2_err_dbp": m2_err_dbp,
                 "m3_sbp": m3_sbp, "m3_dbp": m3_dbp, "m3_map": m3_map,
                 "m3_err_sbp": m3_err_sbp, "m3_err_dbp": m3_err_dbp,
                 "cat_m3": cat_m3,
@@ -2005,14 +1898,13 @@ class ShimmerECGBPMainWindow(QMainWindow):
                 self.rec_pred_file.flush()
                 self.rec_n_preds += 1
 
-            self._update_3_cards(rec)
+            self._update_cards(rec)
             self._refresh_tables_and_summary()
 
             self._log(
                 f"[{self.rec_session_label} W{win_no} t={t_end_s:.0f}s | GT {gt_sbp:.0f}/{gt_dbp:.0f}] "
-                f"M1(Pure): {m1_sbp:.1f}/{m1_dbp:.1f} (Err {m1_err_sbp:.1f}/{m1_err_dbp:.1f}) | "
-                f"M2(120/80): {m2_sbp:.1f}/{m2_dbp:.1f} (Err {m2_err_sbp:.1f}/{m2_err_dbp:.1f}) | "
-                f"M3(Manset): {m3_sbp:.1f}/{m3_dbp:.1f} (Err {m3_err_sbp:.1f}/{m3_err_dbp:.1f}) [{latency_ms:.1f} ms]"
+                f"Tanpa Kal: {m1_sbp:.1f}/{m1_dbp:.1f} (Err {m1_err_sbp:.1f}/{m1_err_dbp:.1f}) | "
+                f"Dengan Kal: {m3_sbp:.1f}/{m3_dbp:.1f} (Err {m3_err_sbp:.1f}/{m3_err_dbp:.1f}) [{latency_ms:.1f} ms]"
             )
 
         except Exception as e:
