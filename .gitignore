@@ -37,11 +37,27 @@ kaggle.json
 credentials.json
 
 # ==============================================================================
-# Jupyter Notebook
+# Jupyter Notebook (Privasi Skripsi)
 # ==============================================================================
+notebooks/
+*.ipynb
 .ipynb_checkpoints/
 */.ipynb_checkpoints/*
 *.ipynb_checkpoints
+
+# ==============================================================================
+# Privasi Data Subjek, PDF, & Dokumen Internal Skripsi
+# ==============================================================================
+recordings/
+landasan_teori_kalibrasi_1_titik/
+docs/
+rumusan_masalah.md
+scripts/generate_bab4*.py
+*.pdf
+*.csv
+*_summary.json
+!data/.gitkeep
+!data/README.md
 
 # ==============================================================================
 # Dataset & Data Files (Besar / Sensitif)
@@ -138,3 +154,6 @@ Thumbs.db
 *.log
 *.tmp
 *.temp
+
+# Rekaman data pasien (privasi)
+recordings/

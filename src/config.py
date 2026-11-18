@@ -25,7 +25,8 @@ class PreprocessingConfig:
     highcut: float = 40.0          # Cutoff frekuensi atas (Hz) - eliminasi noise otot/EMG
     filter_order: int = 2          # Orde filter Butterworth (N=2, setara Orde 4 total saat filtfilt)
     
-    # Normalisasi Persentil Clipping & Scaling [0, 1] (Proposal Subbab 2.2.4)
+    # Normalisasi Min-Max Scaling [0, 1] (Sesuai Fan et al., 2021 & Pelatihan Model Kaggle)
+    norm_mode: str = "minmax"      # "minmax" (Fan et al. & Checkpoint Training) | "percentile_clip" | "robust"
     clip_q_low: float = 1.0        # Persentil batas bawah (Q_low = persentil ke-1)
     clip_q_high: float = 99.0      # Persentil batas atas (Q_high = persentil ke-99)
     epsilon: float = 1e-8          # Mencegah pembagian dengan nol

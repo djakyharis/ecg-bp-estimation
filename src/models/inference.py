@@ -4,6 +4,7 @@ Menggabungkan ECGPreprocessingPipeline dan ECGMultiTaskBiLSTM.
 """
 
 from typing import Dict, Any, Union, Optional
+import time
 import numpy as np
 import torch
 
@@ -131,7 +132,8 @@ class ECGBPPredictor:
     def predict(
         self,
         raw_ecg_signal: np.ndarray,
-        input_fs: Optional[float] = None
+        input_fs: Optional[float] = 125.0,
+        norm_mode: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Menjalankan estimasi tekanan darah lengkap dari sinyal ECG mentah.
@@ -142,17 +144,23 @@ class ECGBPPredictor:
             Sinyal ECG mentah 1D array (minimal 1250 sampel untuk 10 detik @ 125 Hz).
         input_fs : float, optional
             Laju sampling input (default 125.0 Hz).
+        norm_mode : str, optional
+            Mode normalisasi ("percentile_clip" sesuai Proposal Subbab 2.2.4, atau "minmax").
 
         Returns
         -------
         Dict[str, Any]
-            Hasil estimasi [SBP, DBP, MAP], sinyal bersih pra-pemrosesan, dan analisis AHA/ACC.
+            Hasil estimasi [SBP, DBP, MAP], sinyal bersih pra-pemrosesan, latensi (ms), dan analisis AHA/ACC.
         """
+        t_start = time.perf_counter()
+
         if raw_ecg_signal.ndim > 1:
             raw_ecg_signal = raw_ecg_signal.flatten()
 
-        # 1. Jalankan pra-pemrosesan (Notch -> Bandpass -> Percentile Scale)
-        clean_ecg = self.pipeline.process(raw_ecg_signal, input_fs=input_fs)
+        eff_fs = input_fs if input_fs is not None else self.target_fs
+
+        # 1. Jalankan pra-pemrosesan (Resample -> IIR Notch 50Hz -> Butterworth Bandpass 0.5-40Hz -> Normalisasi [0, 1])
+        clean_ecg = self.pipeline.process(raw_ecg_signal, input_fs=eff_fs, norm_mode=norm_mode)
 
         # Pastikan ukuran pas 1250 sampel (10 detik @ 125 Hz)
         epoch_len = int(self.target_fs * 10.0)
@@ -191,6 +199,8 @@ class ECGBPPredictor:
             dbp = float(dbp_t.squeeze().cpu().numpy())
             map_val = float(map_t.squeeze().cpu().numpy())
 
+        latency_ms = (time.perf_counter() - t_start) * 1000.0
+
         # 3. Interpretasi Klinis
         clinical_info = classify_blood_pressure_aha(sbp, dbp)
 
@@ -198,6 +208,7 @@ class ECGBPPredictor:
             "sbp": round(sbp, 2),
             "dbp": round(dbp, 2),
             "map": round(map_val, 2),
+            "latency_ms": round(latency_ms, 2),
             "clean_ecg": clean_epoch.tolist(),
             "raw_ecg": raw_ecg_signal[:epoch_len].tolist(),
             "clinical": clinical_info,
