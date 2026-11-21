@@ -1,0 +1,98 @@
+{
+  "n_windows": 6,
+  "uncalibrated": {
+    "n_windows": 6,
+    "sbp": {
+      "mean_pred": 119.62,
+      "mean_ref": 97.0,
+      "mae": 22.62,
+      "rmse": 22.77,
+      "me": 22.62,
+      "std": 2.64,
+      "aami_pass": false,
+      "bhs_le5_pct": 0.0,
+      "bhs_le10_pct": 0.0,
+      "bhs_le15_pct": 0.0,
+      "bhs_grade": "D"
+    },
+    "dbp": {
+      "mean_pred": 68.2,
+      "mean_ref": 52.0,
+      "mae": 16.2,
+      "rmse": 16.22,
+      "me": 16.2,
+      "std": 0.72,
+      "aami_pass": false,
+      "bhs_le5_pct": 0.0,
+      "bhs_le10_pct": 0.0,
+      "bhs_le15_pct": 16.7,
+      "bhs_grade": "D"
+    }
+  },
+  "calibrated": {
+    "n_windows": 6,
+    "sbp": {
+      "mean_pred": 101.82,
+      "mean_ref": 97.0,
+      "mae": 4.82,
+      "rmse": 5.49,
+      "me": 4.82,
+      "std": 2.64,
+      "aami_pass": true,
+      "bhs_le5_pct": 50.0,
+      "bhs_le10_pct": 100.0,
+      "bhs_le15_pct": 100.0,
+      "bhs_grade": "B"
+    },
+    "dbp": {
+      "mean_pred": 53.4,
+      "mean_ref": 52.0,
+      "mae": 1.4,
+      "rmse": 1.57,
+      "me": 1.4,
+      "std": 0.72,
+      "aami_pass": true,
+      "bhs_le5_pct": 100.0,
+      "bhs_le10_pct": 100.0,
+      "bhs_le15_pct": 100.0,
+      "bhs_grade": "A"
+    }
+  },
+  "active_mode": "TERKALIBRASI",
+  "active": {
+    "n_windows": 6,
+    "sbp": {
+      "mean_pred": 101.82,
+      "mean_ref": 97.0,
+      "mae": 4.82,
+      "rmse": 5.49,
+      "me": 4.82,
+      "std": 2.64,
+      "aami_pass": true,
+      "bhs_le5_pct": 50.0,
+      "bhs_le10_pct": 100.0,
+      "bhs_le15_pct": 100.0,
+      "bhs_grade": "B"
+    },
+    "dbp": {
+      "mean_pred": 53.4,
+      "mean_ref": 52.0,
+      "mae": 1.4,
+      "rmse": 1.57,
+      "me": 1.4,
+      "std": 0.72,
+      "aami_pass": true,
+      "bhs_le5_pct": 100.0,
+      "bhs_le10_pct": 100.0,
+      "bhs_le15_pct": 100.0,
+      "bhs_grade": "A"
+    }
+  },
+  "rm3_performance": {
+    "avg_latency_ms": 3.69,
+    "max_latency_ms": 3.77,
+    "latency_target_pass": true,
+    "avg_fps": 28.5,
+    "buffer_congestion": "Zero Congestion"
+  }
+}

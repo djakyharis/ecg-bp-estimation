@@ -48,7 +48,9 @@ notebooks/
 # ==============================================================================
 # Privasi Data Subjek, PDF, & Dokumen Internal Skripsi
 # ==============================================================================
+# Hasil Rekaman dan Percobaan Subjek (Privacy)
 recordings/
+Percobaan/
 landasan_teori_kalibrasi_1_titik/
 docs/
 rumusan_masalah.md
@@ -58,6 +60,7 @@ scripts/generate_bab4*.py
 *_summary.json
 !data/.gitkeep
 !data/README.md
+!hasil_pengujian/**
 
 # ==============================================================================
 # Dataset & Data Files (Besar / Sensitif)
@@ -156,4 +159,6 @@ Thumbs.db
 *.temp
 
 # Rekaman data pasien (privasi)
+# Hasil Rekaman dan Percobaan Subjek (Privacy)
 recordings/
+Percobaan/

@@ -1806,8 +1806,15 @@ class ShimmerECGBPMainWindow(QMainWindow):
 
         raw_centered = raw_disp_ecg - float(np.median(raw_disp_ecg))
         try:
-            raw_detrended = scipy.signal.detrend(raw_centered, type="linear")
-            disp_ecg = self.prep_pipeline.filter_only(raw_detrended, input_fs=self.fs)
+            # Filter KAUSAL (Notch 50Hz + BPF 0.5-40Hz) pada SELURUH buffer lalu potong bagian tampilan.
+            # Menghindari efek tepi filtfilt/detrend pada ujung kanan jendela yang bergeser.
+            full = ecg_data - float(ecg_data[0])
+            zi_n = scipy.signal.lfilter_zi(self._b_notch, self._a_notch) * 0.0
+            zi_b = scipy.signal.lfilter_zi(self._b_bp, self._a_bp) * 0.0
+            notched, _ = scipy.signal.lfilter(self._b_notch, self._a_notch, full, zi=zi_n)
+            cleaned, _ = scipy.signal.lfilter(self._b_bp, self._a_bp, notched, zi=zi_b)
+            disp_ecg = cleaned[-len(raw_disp_ecg):]
+            disp_ecg = disp_ecg - float(np.median(disp_ecg))
         except Exception:
             disp_ecg = raw_centered
 
